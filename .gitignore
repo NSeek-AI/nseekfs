@@ -1,0 +1,216 @@
+# NSeekFS Public Repository .gitignore
+# Only Python package - NO Rust source code
+
+# ========================================
+# 🔒 CRITICAL: NEVER COMMIT RUST CODE
+# ========================================
+# Rust source code and build files
+src/
+target/
+Cargo.toml
+Cargo.lock
+build.rs
+*.rs
+Cargo.toml.orig
+pyproject.toml
+
+# Core engine files (keep private)
+core/
+engine/
+private/
+internal/
+*.rust
+*.core
+
+# ========================================
+# 🐍 Python Package Development
+# ========================================
+# Compiled Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+wheels/
+*.whl
+*.tar.gz
+
+# NOTE: We INCLUDE pre-compiled binaries for distribution:
+# *.so    <- COMMENTED OUT - we need the pre-compiled .so file
+# *.dll   <- COMMENTED OUT - we need the pre-compiled .dll file  
+# *.dylib <- COMMENTED OUT - we need the pre-compiled .dylib file
+# *.pyd   <- COMMENTED OUT - we need the pre-compiled .pyd file
+
+# ========================================
+# 🔧 Development Environment
+# ========================================
+# Virtual environments  
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.github/
+
+# Environment files with secrets
+.env.local
+.env.*.local
+config.json
+secrets.json
+*.key
+*.pem
+*.cert
+
+# ========================================
+# 🧪 Testing & Coverage
+# ========================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Test data and indices
+test_index.*
+benchmark_data/
+sample_embeddings.*
+*.npy
+*.npz
+*.bin
+*.h5
+*.hdf5
+
+# ========================================
+# 🛠️ IDE and Tools
+# ========================================
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+
+# Vim/Emacs
+*.swp
+*.swo
+*~
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ========================================
+# 🖥️ OS Generated Files
+# ========================================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Linux
+*~
+.directory
+
+# ========================================
+# 📊 Performance & Profiling  
+# ========================================
+.prof
+*.prof
+.benchmark_cache/
+performance_logs/
+*.perf
+
+# ========================================
+# 📝 Documentation Build
+# ========================================
+docs/_build/
+docs/build/
+site/
+
+# ========================================
+# 🚀 CI/CD & Deployment
+# ========================================
+.github/secrets/
+deployment.yml
+deploy_key*
+*.log
+
+# Local CI artifacts
+.coverage*
+junit.xml
+test-results/
+
+# ========================================
+# 📈 Data & Temporary Files
+# ========================================
+data/
+datasets/
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Large files that shouldn't be in git
+*.parquet
+*.jsonl
+
+# ========================================
+# 🔐 Security - Never commit these
+# ========================================
+# API keys and tokens
+*.token
+api_keys.txt
+credentials.json
+
+# SSH keys
+id_rsa*
+id_ed25519*
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# ========================================
+# 📦 Package Management
+# ========================================
+pip-log.txt
+pip-delete-this-directory.txt
+.mypy_cache/
+.ruff_cache/
+.black_cache/
+
+# Conda environments
+.conda/
+conda-meta/
+
+# ========================================
+# 🎯 Project Specific Exclusions
+# ========================================
+# NSeekFS specific patterns
+nseekfs_test_*
+benchmark_results_*
+stress_test_*
+production_test_*
+
+# Temporary build files
+maturin_*
+wheel_*

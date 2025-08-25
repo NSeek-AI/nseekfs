@@ -1,0 +1,30 @@
+# MANIFEST.in para NSeekFS v1.0.0
+# Garantir que todos os arquivos Python são incluídos no wheel
+
+# ✅ INCLUIR TODOS OS ARQUIVOS PYTHON
+include nseekfs/__init__.py
+include nseekfs/highlevel.py
+include nseekfs/validation.py
+recursive-include nseekfs *.py
+
+# ✅ INCLUIR ARQUIVOS DE CONFIGURAÇÃO
+include README.md
+include LICENSE
+include CHANGELOG.md
+include pyproject.toml
+include Cargo.toml
+
+# ✅ INCLUIR ARQUIVOS RUST (para builds from source)
+recursive-include src *.rs
+include build.rs
+
+# ✅ EXCLUIR ARQUIVOS DESNECESSÁRIOS
+exclude .gitignore
+exclude .git
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * *.orig
+recursive-exclude * *.rej
+recursive-exclude * .DS_Store
+exclude target
+recursive-exclude target *
