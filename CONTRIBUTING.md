@@ -17,27 +17,12 @@ NSeekFS v1.0 focuses on **exact vector search** with high performance and reliab
 - **Rust 1.70+** (for development)
 - **Git**
 
-### Quick Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/diogonovo/nseekfs.git
-cd nseekfs
-
-# Run setup script
-chmod +x setup_dev.sh
-./setup_dev.sh
-```
-
 ### Manual Setup
 
 ```bash
 # Create virtual environment
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install development dependencies
-pip install -r requirements-dev.txt
 
 # Install maturin for Rust-Python bindings
 pip install maturin
@@ -78,18 +63,13 @@ We welcome several types of contributions:
 
 ```
 nseekfs/
-├── src/                    # Rust source code
-│   ├── lib.rs             # Main Python bindings
-│   ├── engine.rs          # Core search engine
-│   ├── prepare.rs         # Index creation
-│   └── utils/             # Utility modules
+├── src/                   # Rust source code
 ├── nseekfs/               # Python package
 │   ├── __init__.py        # Main API
 │   ├── highlevel.py       # High-level interface
 │   └── validation.py      # Input validation
 ├── tests/                 # Test suite
-├── examples/              # Usage examples
-└── docs/                  # Documentation
+└── examples/              # Usage examples
 ```
 
 #### Rust Development

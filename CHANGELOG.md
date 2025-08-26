@@ -108,4 +108,4 @@ This release represents months of development, optimization, and rigorous testin
 
 ---
 
-**Keep this changelog updated with each release!**
+**Keeping this changelog updated with each release!**
