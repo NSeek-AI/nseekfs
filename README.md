@@ -32,12 +32,34 @@ import numpy as np
 embeddings = np.random.randn(100000, 384).astype(np.float32)
 query = np.random.randn(384).astype(np.float32)
 
-# Build index and search
-index = nseekfs.from_embeddings(embeddings)
+# Build index and search - CORRECTED API
+index = nseekfs.from_embeddings(embeddings, normalize=True, verbose=False)
 results = index.query(query, top_k=10)
 
 # Clean results: [{'idx': 0, 'score': 0.95}, ...]
 print(f"Top result: index {results[0]['idx']} with score {results[0]['score']:.3f}")
+```
+
+## 🛠️ Advanced Features
+
+```python
+# Verbose mode for debugging
+index = nseekfs.from_embeddings(embeddings, normalize=True, verbose=True)
+
+# Control normalization
+index = nseekfs.from_embeddings(embeddings, normalize=False, verbose=False)
+
+# Batch queries for maximum efficiency  
+queries = np.random.randn(100, 384).astype(np.float32)
+all_results = index.query_batch(queries, top_k=5)
+
+# Performance monitoring
+try:
+    metrics = index.get_performance_metrics()
+    print(f"Total queries: {metrics['total_queries']}")
+    print(f"Average query time: {metrics['avg_query_time_ms']:.2f}ms")
+except AttributeError:
+    print("Performance metrics not available")
 ```
 
 ## 🏆 Real-World Performance

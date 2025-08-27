@@ -5,22 +5,21 @@
 # 🔒 CRITICAL: NEVER COMMIT RUST CODE
 # ========================================
 # Rust source code and build files
-src/
+#src/
 target/
-Cargo.toml
-Cargo.lock
-build.rs
-*.rs
-Cargo.toml.orig
-pyproject.toml
-
-# Core engine files (keep private)
-core/
-engine/
-private/
-internal/
-*.rust
-*.core
+#Cargo.toml
+#Cargo.lock
+#build.rs
+#*.rs
+#Cargo.toml.orig
+#
+## Core engine files (keep private)
+#core/
+#engine/
+#private/
+#internal/
+#*.rust
+#*.core
 
 # ========================================
 # 🐍 Python Package Development
@@ -57,7 +56,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-.github/
 
 # Environment files with secrets
 .env.local

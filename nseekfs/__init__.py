@@ -2,26 +2,26 @@
 NSeekFS v1.0 - High-Performance Exact Vector Search
 ==================================================
 
- v1.0 Features:
+v1.0 Features:
 - Simplified API (clean and efficient)
 - Built-in verbose logging and timing
 
 Simple Usage:
     import nseekfs
     
-    # Simple API
-    index = nseekfs.from_embeddings(vectors)
+    # Simple API - CORRECTED
+    index = nseekfs.from_embeddings(vectors, normalize=True, verbose=False)
     results = index.query(query_vector, top_k=10)
     # Returns: [{'idx': 0, 'score': 0.95}, ...]
 
-With Timing:
-    # Get timing information when needed
-    results, timing = index.query(query_vector, top_k=10, return_timing=True)
-    
 Verbose Mode:
-    # Enable detailed logging
-    index = nseekfs.from_embeddings(vectors, verbose=True)
+    # Enable detailed logging - CORRECTED
+    index = nseekfs.from_embeddings(vectors, normalize=True, verbose=True)
     results = index.query(query_vector, top_k=10)  # Shows detailed logs
+
+Control Normalization:
+    # Disable normalization if vectors are already normalized
+    index = nseekfs.from_embeddings(vectors, normalize=False, verbose=False)
 """
 
 import sys
@@ -32,10 +32,10 @@ from typing import Any, Dict, List, Optional, Union
 
 __version__ = "1.0.0"
 __author__ = "Diogo Novo"
-__email__ = "diogonovo@outlook.pt"
+__email__ = "contact@nseek.io"
 __license__ = "MIT"
 __description__ = "High-performance exact vector similarity search with Rust backend"
-__url__ = "https://github.com/diogonovo/nseekfs"
+__url__ = "https://github.com/NSeek-AI/nseekfs"
 
 
 __version_info__ = tuple(map(int, __version__.split('.')))
@@ -68,9 +68,9 @@ _check_compatibility()
 
 
 # MAIN API - The essentials
-def from_embeddings(vectors, dims=None, normalize=True, verbose=False):
+def from_embeddings(vectors, normalized=True, verbose=False):
     """Create index from embeddings - main entry point"""
-    return _hl().from_embeddings(vectors, dims=dims, normalize=normalize, verbose=verbose)
+    return _hl().from_embeddings(vectors, normalized=normalized, verbose=verbose)
 
 
 def from_bin(bin_file_path, verbose=False):

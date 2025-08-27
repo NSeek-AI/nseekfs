@@ -26,7 +26,7 @@ __version__ = "1.0.0"
 class SearchConfig:
     """Configuração para o engine de busca"""
     metric: str = "cosine"
-    normalize: bool = True
+    normalized: bool = True
     verbose: bool = False
     enable_metrics: bool = False
 
@@ -239,7 +239,7 @@ def from_embeddings(embeddings: np.ndarray,
     
     # Config
     if config is None:
-        config = SearchConfig(metric=metric, normalize=normalized, verbose=verbose)
+        config = SearchConfig(metric=metric, normalized=normalized, verbose=verbose)
     
     # Prepare binary file using Rust function
     try:
