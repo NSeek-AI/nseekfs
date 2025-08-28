@@ -32,10 +32,13 @@ jobs:
       run: |
         echo "🔍 Checking for pre-compiled binary..."
         ls -la nseekfs/
-        if ls nseekfs/*.pyd nseekfs/*.so nseekfs/*.dll nseekfs/*.dylib 2>/dev/null; then
-          echo "✅ Found binary"
+        
+        # Check for any binary files
+        if find nseekfs/ -name "*.pyd" -o -name "*.so" -o -name "*.dll" -o -name "*.dylib" | grep -q .; then
+          echo "✅ Found binary files:"
+          find nseekfs/ -name "*.pyd" -o -name "*.so" -o -name "*.dll" -o -name "*.dylib"
         else
-          echo "❌ No binary found - please upload first!"
+          echo "❌ No binary found!"
           exit 1
         fi
     
