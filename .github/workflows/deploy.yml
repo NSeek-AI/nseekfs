@@ -68,7 +68,7 @@ jobs:
       shell: bash
     
     - name: 📤 Upload wheel
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wheels-${{ matrix.os }}
         path: target/wheels/*.whl
@@ -104,7 +104,7 @@ jobs:
         grep "__version__.*=" nseekfs/__init__.py
     
     - name: 📦 Download all platform wheels
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: temp-wheels/
     
