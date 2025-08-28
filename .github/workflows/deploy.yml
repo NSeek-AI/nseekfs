@@ -1,61 +1,203 @@
-name: Deploy to PyPI (Binary Distribution)
+name: 🚀 Build All Platforms and Deploy
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to deploy (e.g., 1.0.0)'
+        description: 'Version to deploy (e.g., 1.0.1)'
         required: true
         type: string
+      target:
+        description: 'Deploy target'
+        required: true
+        type: choice
+        options:
+        - testpypi
+        - pypi
+        default: testpypi
 
 jobs:
-  deploy:
-    name: 🚀 Deploy to PyPI
-    runs-on: ubuntu-latest
-    
+  # ==================== BUILD PARA TODAS AS PLATAFORMAS ====================
+  build-all-platforms:
+    name: 🛠️ Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        
     steps:
-    - name: Checkout
+    - name: 📥 Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Python
+    - name: 🐍 Set up Python 3.11
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
     
-    - name: Update version
+    - name: 🦀 Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: 📦 Install maturin
+      run: pip install maturin
+    
+    - name: 🏗️ Build wheel for ${{ matrix.os }}
+      run: |
+        echo "🔨 Building wheel for ${{ matrix.os }}..."
+        
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          # Linux: use manylinux for maximum compatibility
+          maturin build --release --strip --manylinux 2014
+          echo "✅ Built Linux wheel with manylinux compatibility"
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          # macOS: build universal wheel for Intel + Apple Silicon
+          maturin build --release --strip --universal2
+          echo "✅ Built macOS universal wheel (Intel + Apple Silicon)"
+        else
+          # Windows: standard build
+          maturin build --release --strip
+          echo "✅ Built Windows wheel"
+        fi
+      shell: bash
+    
+    - name: 📋 List built files
+      run: |
+        echo "📦 Files built on ${{ matrix.os }}:"
+        ls -la target/wheels/ 2>/dev/null || echo "No wheels directory found"
+        find . -name "*.whl" -type f 2>/dev/null || echo "No .whl files found"
+      shell: bash
+    
+    - name: 📤 Upload wheel
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels-${{ matrix.os }}
+        path: target/wheels/*.whl
+        retention-days: 1
+
+  # ==================== DEPLOY UNIFICADO ====================
+  deploy:
+    name: 🚀 Deploy to ${{ github.event.inputs.target }}
+    runs-on: ubuntu-latest
+    needs: [build-all-platforms]
+    environment: ${{ github.event.inputs.target == 'pypi' && 'production' || 'testing' }}
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+    
+    - name: 🔄 Update version in source files
       run: |
         VERSION="${{ github.event.inputs.version }}"
-        sed -i "s/version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
-        sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" nseekfs/__init__.py
-    
-    - name: Check binary exists
-      run: |
-        echo "🔍 Checking for pre-compiled binary..."
-        ls -la nseekfs/
+        echo "📝 Updating version to ${VERSION}..."
         
-        # Check for any binary files
-        if find nseekfs/ -name "*.pyd" -o -name "*.so" -o -name "*.dll" -o -name "*.dylib" | grep -q .; then
-          echo "✅ Found binary files:"
-          find nseekfs/ -name "*.pyd" -o -name "*.so" -o -name "*.dll" -o -name "*.dylib"
-        else
-          echo "❌ No binary found!"
+        # Update pyproject.toml
+        sed -i "s/version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+        
+        # Update __init__.py  
+        sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" nseekfs/__init__.py
+        
+        echo "✅ Version updated in source files"
+        
+        # Show changes
+        echo "📋 Updated files:"
+        grep "version.*=" pyproject.toml
+        grep "__version__.*=" nseekfs/__init__.py
+    
+    - name: 📦 Download all platform wheels
+      uses: actions/download-artifact@v3
+      with:
+        path: temp-wheels/
+    
+    - name: 🗂️ Organize wheels
+      run: |
+        echo "📋 Organizing wheels from all platforms..."
+        mkdir -p dist/
+        
+        # Move all wheels to dist directory
+        find temp-wheels/ -name "*.whl" -exec mv {} dist/ \;
+        
+        echo "📦 Final wheel collection:"
+        ls -la dist/
+        
+        # Count wheels
+        wheel_count=$(ls dist/*.whl 2>/dev/null | wc -l)
+        echo "📊 Total wheels: ${wheel_count}"
+        
+        if [ "$wheel_count" -lt 3 ]; then
+          echo "⚠️ Warning: Expected at least 3 wheels (Linux, Windows, macOS)"
+          echo "❌ Only found ${wheel_count} wheels"
           exit 1
         fi
+        
+        echo "✅ Successfully collected wheels from all platforms"
     
-    - name: Build package
+    - name: 🏗️ Build source distribution
       run: |
-        pip install build twine
-        python -m build
+        echo "📦 Building source distribution..."
+        pip install build
+        python -m build --sdist
         
-    - name: Verify package
+        echo "📋 Source distribution:"
+        ls -la dist/*.tar.gz
+    
+    - name: 🔍 Verify packages
       run: |
+        echo "🧪 Verifying all packages..."
+        pip install twine
         twine check dist/*
-        echo "📦 Package contents:"
-        unzip -l dist/*.whl
         
-    - name: Publish to PyPI
+        echo "📊 Package summary:"
+        echo "  Wheels: $(ls dist/*.whl | wc -l)"
+        echo "  Source: $(ls dist/*.tar.gz | wc -l)"
+        echo "  Total:  $(ls dist/* | wc -l)"
+        
+        echo "📋 Package contents preview:"
+        for wheel in dist/*.whl; do
+          echo "Contents of $(basename $wheel):"
+          python -m zipfile -l "$wheel" | head -10
+          echo "---"
+        done
+    
+    - name: 🚀 Deploy to TestPyPI
+      if: github.event.inputs.target == 'testpypi'
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
         password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         repository-url: https://test.pypi.org/legacy/
+        packages-dir: dist/
+        skip-existing: true
+    
+    - name: 🏆 Deploy to Production PyPI
+      if: github.event.inputs.target == 'pypi'
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        packages-dir: dist/
+    
+    - name: 🎉 Deployment Success
+      run: |
+        TARGET="${{ github.event.inputs.target }}"
+        VERSION="${{ github.event.inputs.version }}"
+        
+        if [ "$TARGET" == "testpypi" ]; then
+          echo "🎊 Successfully deployed to TestPyPI!"
+          echo "🧪 Test installation:"
+          echo "   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ nseekfs==${VERSION}"
+          echo "🔗 TestPyPI page: https://test.pypi.org/project/nseekfs/${VERSION}/"
+        else
+          echo "🎉 Successfully deployed to Production PyPI!"
+          echo "📦 Installation command:"
+          echo "   pip install nseekfs==${VERSION}"
+          echo "🔗 PyPI page: https://pypi.org/project/nseekfs/${VERSION}/"
+        fi
+        
+        echo ""
+        echo "📊 Deployment Summary:"
+        echo "  📦 Package: nseekfs"
+        echo "  🏷️  Version: ${VERSION}"
+        echo "  🎯 Target: ${TARGET}"
+        echo "  🛠️  Platforms: Linux, Windows, macOS"
+        echo "  ⚡ SIMD: AVX2 optimized"
+        echo "  🐍 Python: 3.8+"
