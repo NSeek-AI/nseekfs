@@ -48,4 +48,6 @@ Issues = "https://github.com/NSeek-AI/nseekfs/issues"
 
 [tool.setuptools]
 packages = ["nseekfs"]
-package-data = {"nseekfs": ["*.pyd", "*.so", "*.dll", "*.dylib"]}
+
+[tool.setuptools.package-data]
+nseekfs = ["*.pyd", "*.so", "*.dll", "*.dylib"]
