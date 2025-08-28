@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nseekfs"
+version = "1.0.0"
+description = "High-performance exact vector similarity search"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Diogo Novo", email = "contact@nseek.io"}]
+keywords = [
+    "vector", 
+    "similarity", 
+    "search", 
+    "rust", 
+    "machine-learning", 
+    "embeddings",
+    "exact-search",
+    "simd",
+    "performance"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database :: Database Engines/Servers",
+    "Typing :: Typed",
+]
+requires-python = ">=3.8"
+dependencies = ["numpy>=1.19.0"]
+
+[project.urls]
+Homepage = "https://github.com/NSeek-AI/nseekfs"
+Repository = "https://github.com/NSeek-AI/nseekfs"
+Issues = "https://github.com/NSeek-AI/nseekfs/issues"
+
+[tool.setuptools]
+packages = ["nseekfs"]
+package-data = {"nseekfs": ["*.pyd", "*.so", "*.dll", "*.dylib"]}
