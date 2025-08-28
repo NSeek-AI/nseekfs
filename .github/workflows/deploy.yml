@@ -1,0 +1,57 @@
+name: Deploy to PyPI (Binary Distribution)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., 1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: 🚀 Deploy to PyPI
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Update version
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        sed -i "s/version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+        sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" nseekfs/__init__.py
+    
+    - name: Check binary exists
+      run: |
+        echo "🔍 Checking for pre-compiled binary..."
+        ls -la nseekfs/
+        if ls nseekfs/*.pyd nseekfs/*.so nseekfs/*.dll nseekfs/*.dylib 2>/dev/null; then
+          echo "✅ Found binary"
+        else
+          echo "❌ No binary found - please upload first!"
+          exit 1
+        fi
+    
+    - name: Build package
+      run: |
+        pip install build twine
+        python -m build
+        
+    - name: Verify package
+      run: |
+        twine check dist/*
+        echo "📦 Package contents:"
+        unzip -l dist/*.whl
+        
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
