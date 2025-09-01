@@ -221,33 +221,13 @@ result_obj = index.query(query_vector, top_k=10, format="detailed")
 # Returns: QueryResult object with metadata
 ```
 
-## 🤝 Contributing
-
-This is an active project with room for improvement.
-
-**Priority areas for contribution:**
-- Expose multiple similarity metrics to Python API
-- Add save functionality to Python API  
-- Multi-threading support for queries
-- Memory usage optimization
-- Documentation and examples
-
-**Development setup:**
-```bash
-git clone https://github.com/NSeek/nseekfs
-cd nseekfs
-pip install maturin numpy
-maturin develop --release
-```
-
 ## 📜 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙋‍♂️ Support
 
-- **Issues**: [GitHub Issues](https://github.com/NSeek/nseekfs/issues)
-- **Source Code**: [GitHub Repository](https://github.com/NSeek/nseekfs)
+- **Source Code**: [GitHub Repository](https://github.com/NSeek-AI/nseekfs)
 
 ## 🔄 Version History
 

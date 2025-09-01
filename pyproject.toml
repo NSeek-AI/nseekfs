@@ -1,24 +1,27 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "nseekfs"
-version = "1.0.0"
-description = "High-performance exact vector similarity search"
+version = "1.0.3"
+description = "High-performance exact vector similarity search with Rust backend"
 readme = "README.md"
+# ✅ CORRIGIDO: Usar 'license' ao invés de 'license-files' (deprecated)
 license = {text = "MIT"}
-authors = [{name = "Diogo Novo", email = "contact@nseek.io"}]
+authors = [
+    {name = "Diogo Novo", email = "contact@nseek.io"}
+]
+maintainers = [
+    {name = "Diogo Novo", email = "contact@nseek.io"}
+]
 keywords = [
     "vector", 
     "similarity", 
     "search", 
     "rust", 
     "machine-learning", 
-    "embeddings",
-    "exact-search",
-    "simd",
-    "performance"
+    "embeddings"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -35,19 +38,112 @@ classifiers = [
     "Programming Language :: Rust",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "Topic :: Database :: Database Engines/Servers",
     "Typing :: Typed",
 ]
 requires-python = ">=3.8"
-dependencies = ["numpy>=1.19.0"]
+dependencies = [
+    "numpy>=1.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-benchmark>=3.4.1",
+    "black>=22.0",
+    "ruff>=0.0.200",
+    "mypy>=0.991",
+]
+analysis = [
+    "scipy>=1.7.0",
+    "scikit-learn>=1.0.0",
+    "pandas>=1.3.0",
+    "matplotlib>=3.3.0",
+    "seaborn>=0.11.0",
+]
+profiling = [
+    "psutil>=5.8.0",
+    "memory-profiler>=0.60.0",
+    "line-profiler>=3.3.0",
+    "py-spy>=0.3.12",
+]
+all = [
+    "nseekfs[dev,analysis,profiling]"
+]
 
 [project.urls]
 Homepage = "https://github.com/NSeek-AI/nseekfs"
-Repository = "https://github.com/NSeek-AI/nseekfs"
-Issues = "https://github.com/NSeek-AI/nseekfs/issues"
+Documentation = "https://github.com/NSeek-AI/nseekfs/wiki"
+Repository = "https://github.com/NSeek-AI/nseekfs.git"
 
-[tool.setuptools]
-packages = ["nseekfs"]
+[project.scripts]
+nseekfs-benchmark = "nseekfs.benchmarks:main"
+nseekfs-analyze = "nseekfs.analysis:main"
 
-[tool.setuptools.package-data]
-nseekfs = ["*.pyd", "*.so", "*.dll", "*.dylib"]
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "."
+module-name = "nseekfs.nseekfs"
+bindings = "pyo3"
+include = ["README.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+"test_*.py" = ["B011"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "scipy.*",
+    "sklearn.*",
+    "matplotlib.*",
+    "seaborn.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+]
+testpaths = ["tests"]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "benchmark: marks tests as benchmarks",
+]

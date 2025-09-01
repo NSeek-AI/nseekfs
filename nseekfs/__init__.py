@@ -30,7 +30,7 @@ from importlib import import_module
 from typing import Any, Dict, List, Optional, Union
 
 
-__version__ = "1.0.0"
+__version__ = "1.0.3"
 __author__ = "Diogo Novo"
 __email__ = "contact@nseek.io"
 __license__ = "MIT"
