@@ -10,18 +10,18 @@ Simple Usage:
     import nseekfs
     
     # Simple API - CORRECTED
-    index = nseekfs.from_embeddings(vectors, normalize=True, verbose=False)
+    index = nseekfs.from_embeddings(vectors, normalized=True, verbose=False)
     results = index.query(query_vector, top_k=10)
     # Returns: [{'idx': 0, 'score': 0.95}, ...]
 
 Verbose Mode:
     # Enable detailed logging - CORRECTED
-    index = nseekfs.from_embeddings(vectors, normalize=True, verbose=True)
+    index = nseekfs.from_embeddings(vectors, normalized=True, verbose=True)
     results = index.query(query_vector, top_k=10)  # Shows detailed logs
 
 Control Normalization:
     # Disable normalization if vectors are already normalized
-    index = nseekfs.from_embeddings(vectors, normalize=False, verbose=False)
+    index = nseekfs.from_embeddings(vectors, normalized=False, verbose=False)
 """
 
 import sys
@@ -30,7 +30,7 @@ from importlib import import_module
 from typing import Any, Dict, List, Optional, Union
 
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 __author__ = "Diogo Novo"
 __email__ = "contact@nseek.io"
 __license__ = "MIT"

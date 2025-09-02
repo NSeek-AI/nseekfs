@@ -4,10 +4,9 @@ build-backend = "maturin"
 
 [project]
 name = "nseekfs"
-version = "1.0.3"
+version = "1.0.4"
 description = "High-performance exact vector similarity search with Rust backend"
 readme = "README.md"
-# ✅ CORRIGIDO: Usar 'license' ao invés de 'license-files' (deprecated)
 license = {text = "MIT"}
 authors = [
     {name = "Diogo Novo", email = "contact@nseek.io"}
