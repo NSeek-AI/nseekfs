@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "nseekfs"
-version = "1.0.4"
+version = "1.0.0"
 description = "High-performance exact vector similarity search with Rust backend"
 readme = "README.md"
 license = {text = "MIT"}
@@ -84,6 +84,13 @@ python-source = "."
 module-name = "nseekfs.nseekfs"
 bindings = "pyo3"
 include = ["README.md", "LICENSE"]
+
+[tool.maturin.cargo]
+rustc-extra-args = [
+    "-C", "opt-level=3", 
+    "-C", "lto=fat",
+    "-C", "codegen-units=1"
+]
 
 [tool.ruff]
 line-length = 100

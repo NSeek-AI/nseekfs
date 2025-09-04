@@ -9,13 +9,13 @@ v1.0 Features:
 Simple Usage:
     import nseekfs
     
-    # Simple API - CORRECTED
+    # Simple API
     index = nseekfs.from_embeddings(vectors, normalized=True, verbose=False)
     results = index.query(query_vector, top_k=10)
     # Returns: [{'idx': 0, 'score': 0.95}, ...]
 
 Verbose Mode:
-    # Enable detailed logging - CORRECTED
+    # Enable detailed logging 
     index = nseekfs.from_embeddings(vectors, normalized=True, verbose=True)
     results = index.query(query_vector, top_k=10)  # Shows detailed logs
 
@@ -30,7 +30,7 @@ from importlib import import_module
 from typing import Any, Dict, List, Optional, Union
 
 
-__version__ = "1.0.4"
+__version__ = "1.0.0"
 __author__ = "Diogo Novo"
 __email__ = "contact@nseek.io"
 __license__ = "MIT"

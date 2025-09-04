@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-NSeekFS v1.0 - High-Level API Completa
-======================================
+NSeekFS v1.0 - High-Level API
+=============================
 
 Vector search simplified API.
 """
@@ -24,7 +24,7 @@ __version__ = "1.0.0"
 
 @dataclass
 class SearchConfig:
-    """Configuração para o engine de busca"""
+    """Configuration for the search engine."""
     metric: str = "cosine"
     normalized: bool = True
     verbose: bool = False
@@ -32,7 +32,7 @@ class SearchConfig:
 
 @dataclass 
 class QueryResult:
-    """Resultado de busca com métricas"""
+    """Search result with timing and diagnostics."""
     results: List[Dict[str, Any]]
     query_time_ms: float
     method_used: str
@@ -52,7 +52,7 @@ class QueryResult:
         return self.results[key]
 
 class SearchEngine:
-    """Engine de busca vetorial"""
+    """Vector search engine wrapper over the Rust core."""
     
     def __init__(self, index_path: Union[str, Path], config: Optional[SearchConfig] = None):
         self.index_path = Path(index_path)
@@ -67,15 +67,17 @@ class SearchEngine:
         load_time = time.time() - start_time
         
         if self.config.verbose:
-            print(f"✅ NSeekFS engine loaded in {load_time:.3f}s")
-            print(f"📊 Index: {self.rows:,} vectors × {self.dims} dimensions")
+            print(f"NSeekFS engine loaded in {load_time:.3f}s")
+            print(f"Index: {self.rows:,} vectors × {self.dims} dimensions")
     
     @property
     def dims(self) -> int:
+        """Number of dimensions of the indexed vectors."""
         return self._engine.dims()
     
     @property  
     def rows(self) -> int:
+        """Number of vectors stored in the index."""
         return self._engine.rows()
     
     def query(self, 
@@ -83,9 +85,22 @@ class SearchEngine:
               top_k: int = 10,
               format: str = "simple",
               return_timing: bool = False) -> Union[List[Dict], QueryResult, Tuple]:
-        """🆕 API SIMPLIFICADA: Buscar vetores similares"""
+        """Simplified API: search for the top_k most similar vectors.
         
-        # Validação
+        Parameters
+        ----------
+        query_vector : np.ndarray
+            1D float32 vector with length == self.dims.
+        top_k : int
+            Number of neighbors to return (clamped to number of rows).
+        format : {"simple","detailed","legacy"}
+            Output format. "simple" returns a list of {idx, score}.
+            "detailed"/"legacy" returns a QueryResult object.
+        return_timing : bool
+            If True, also returns a dict with timing flags.
+        """
+        
+        # Validation and dtype enforcement
         if not isinstance(query_vector, np.ndarray):
             query_vector = np.asarray(query_vector, dtype=np.float32)
         
@@ -104,14 +119,14 @@ class SearchEngine:
         if top_k > self.rows:
             top_k = self.rows
         
-        # Execute query
+        # Execute exact query
         start_time = time.time()
         
         try:
             rr = self._engine.query_exact(query_vector, int(top_k))
             query_time = (time.time() - start_time) * 1000.0
 
-            # Extract results
+            # Extract results and diagnostics
             results_py = []
             method_used = getattr(rr, "method_used", "exact")
             candidates_generated = getattr(rr, "candidates_generated", 0)
@@ -127,14 +142,14 @@ class SearchEngine:
                     if idx is not None and score is not None:
                         results_py.append({"idx": int(idx), "score": float(score)})
 
-            #  FORMATO SIMPLIFICADO POR DEFEITO
+            # Default simplified format
             if format == "simple":
                 if return_timing:
                     return results_py, {"query_time_ms": query_time, "simd_used": simd_used}
                 else:
                     return results_py
             
-            # Formato detalhado
+            # Detailed format
             qr = QueryResult(
                 results=results_py,
                 query_time_ms=query_time,
@@ -159,15 +174,15 @@ class SearchEngine:
             raise RuntimeError(f"Query failed: {e}")
     
     def query_simple(self, query_vector: np.ndarray, top_k: int = 10) -> List[Dict]:
-        """ ATALHO: Query simples sem métricas"""
+        """Shortcut: simple query without metrics."""
         return self.query(query_vector, top_k, format="simple")
     
     def query_detailed(self, query_vector: np.ndarray, top_k: int = 10) -> QueryResult:
-        """ ATALHO: Query com métricas completas"""
+        """Shortcut: query with full metrics."""
         return self.query(query_vector, top_k, format="detailed")
     
     def query_batch(self, queries: np.ndarray, top_k: int = 10, format: str = "simple") -> List:
-        """Query em batch"""
+        """Batch querying convenience method (iterates per row)."""
         if not isinstance(queries, np.ndarray):
             queries = np.asarray(queries, dtype=np.float32)
             
@@ -188,7 +203,7 @@ class SearchEngine:
         return results
     
     def get_performance_metrics(self) -> Dict[str, Any]:
-        """Obter métricas de performance"""
+        """Return aggregated performance metrics if available."""
         try:
             return self._engine.get_performance_metrics()
         except AttributeError:
@@ -208,13 +223,13 @@ class SearchEngine:
 
 
 def from_embeddings(embeddings: np.ndarray,
-                   metric: str = "cosine",
-                   base_name: str = "nseekfs_index",
-                   output_dir: Optional[str] = None,
-                   normalized: bool = False,
-                   config: Optional[SearchConfig] = None,
-                   verbose: bool = False) -> SearchEngine:
-    """🆕 SIMPLIFICADO: Criar índice de busca a partir de embeddings"""
+                    metric: str = "cosine",
+                    base_name: str = "nseekfs_index",
+                    output_dir: Optional[str] = None,
+                    normalized: bool = False,
+                    config: Optional[SearchConfig] = None,
+                    verbose: bool = False) -> SearchEngine:
+    """Create a search index from a 2D embeddings array and return a loaded engine."""
     
     if output_dir is None:
         output_dir = os.getcwd()
@@ -237,37 +252,37 @@ def from_embeddings(embeddings: np.ndarray,
     if rows == 0 or dims == 0:
         raise ValueError("Embeddings cannot be empty")
     
-    # Config
+    # Configuration (kept for future extensibility)
     if config is None:
         config = SearchConfig(metric=metric, normalized=normalized, verbose=verbose)
     
-    # Prepare binary file using Rust function
+    # Prepare binary file using the Rust function
     try:
         from nseekfs.nseekfs import py_prepare_bin_from_embeddings
     except ImportError:
         raise RuntimeError("Rust engine not available. Please ensure NSeekFS is properly compiled.")
     
     if verbose:
-        print(f"🔄 Creating index for {rows:,} vectors × {dims}D...")
+        print(f"Creating index for {rows:,} vectors × {dims}D...")
         start_time = time.time()
     
     try:
         result_path = py_prepare_bin_from_embeddings(
             embeddings,         # numpy array
-            dims,              # dimensions
-            rows,              # number of vectors
-            base_name,         # base name
-            str(output_dir),   # output directory
-            "f32",             # level (precision)
-            normalized,        # normalization flag
-            False,             # ann flag (always False for exact search)
-            None,              # seed (optional)
+            dims,               # dimensions
+            rows,               # number of vectors
+            base_name,          # base name
+            str(output_dir),    # output directory
+            "f32",              # precision level
+            normalized,         # normalization flag
+            False,              # ann flag (always False for exact search)
+            None,               # seed (optional)
         )
         
         if verbose:
             creation_time = time.time() - start_time
-            print(f"✅ Index created in {creation_time:.2f}s")
-            print(f"📁 Saved to: {result_path}")
+            print(f"Index created in {creation_time:.2f}s")
+            print(f"Saved to: {result_path}")
         
         return SearchEngine(result_path, config)
         
@@ -278,13 +293,13 @@ def from_embeddings(embeddings: np.ndarray,
 def load_index(index_path: Union[str, Path], 
                config: Optional[SearchConfig] = None,
                verbose: bool = False) -> SearchEngine:
-    """Carregar índice existente"""
+    """Load an existing index from disk."""
     if config is None:
         config = SearchConfig(verbose=verbose)
     
     return SearchEngine(index_path, config)
 
 
-# Compatibility
+# Compatibility aliases for downstream code
 ValidationError = ValueError
 IndexError = Exception
