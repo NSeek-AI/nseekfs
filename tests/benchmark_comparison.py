@@ -1,647 +1,801 @@
-#!/usr/bin/env python3
-"""
-NSeekFS v1.0 - Comparative Benchmark
-====================================
+def print_analysis(self):
+        """Print comprehensive analysis of results"""
+        
+        print_section("COMPREHENSIVE ANALYSIS")
+        
+        if not self.results:
+            print("No results to analyze")
+            return
+        
+        # Collect all successful results across datasets
+        all_successful = {}
+        total_comparisons = 0
+        
+        for result in self.results:
+            dataset_name = result.get('dataset_name', 'unknown')
+            for lib, data in result.items():
+                if lib in ['dataset_name', 'data_size_mb', 'n_vectors', 'dimensions', 'num_queries', 'top_k']:
+                    continue
+                    
+                if isinstance(data, dict) and data.get('success', False):
+                    if lib not in all_successful:
+                        all_successful[lib] = []
+                    all_successful[lib].append({
+                        'dataset': dataset_name,
+                        'avg_time_ms': data['avg_time_ms'],
+                        'qps': data['qps'],
+                        'build_time_ms': data.get('build_time_ms', 0)
+                    })
+                    total_comparisons += 1
+        
+        if not all_successful:
+            print("No successful results to analyze")
+            return
+        
+        print(f"Libraries tested: {len(all_successful)}")
+        print(f"Datasets: {len(self.results)}")
+        
+        # Overall speed ranking
+        print(f"\nOverall Performance Ranking (avg query time):")
+        
+        lib_avg_times = {}
+        for lib, results in all_successful.items():
+            lib_avg_times[lib] = np.mean([r['avg_time_ms'] for r in results])
+        
+        sorted_libs = sorted(lib_avg_times.items(), key=lambda x: x[1])
+        
+        for i, (lib, avg_time) in enumerate(sorted_libs, 1):
+            results_count = len(all_successful[lib])
+            avg_qps = 1000 / avg_time
+            
+            if i == 1:
+                print(f"  🥇 {lib.upper()}: {avg_time:.2f}ms avg ({avg_qps:.0f} QPS, {results_count} tests)")
+            elif i == 2:
+                print(f"  🥈 {lib.upper()}: {avg_time:.2f}ms avg ({avg_qps:.0f} QPS, {results_count} tests)")
+            elif i == 3:
+                print(f"  🥉 {lib.upper()}: {avg_time:.2f}ms avg ({avg_qps:.0f} QPS, {results_count} tests)")
+            else:
+                print(f"  {i}. {lib.upper()}: {avg_time:.2f}ms avg ({avg_qps:.0f} QPS, {results_count} tests)")
+        
+        # Build time analysis
+        libs_with_build = {lib: data for lib, data in all_successful.items() 
+                          if any(r['build_time_ms'] > 0 for r in data)}
+        
+        if libs_with_build:
+            print(f"\nBuild Time Analysis:")
+            for lib, results in libs_with_build.items():
+                avg_build = np.mean([r['build_time_ms'] for r in results])
+                print(f"  {lib.upper()}: {avg_build:.1f}ms avg build time")
+        
+        # NSeekFS specific analysis
+        if 'nseekfs' in all_successful:
+            print(f"\nNSeekFS Performance Analysis:")
+            nseekfs_results = all_successful['nseekfs']
+            
+            for other_lib in all_successful:
+                if other_lib == 'nseekfs':
+                    continue
+                    
+                other_results = all_successful[other_lib]
+                nseekfs_avg = np.mean([r['avg_time_ms'] for r in nseekfs_results])
+                other_avg = np.mean([r['avg_time_ms'] for r in other_results])
+                
+                if other_avg < nseekfs_avg:
+                    speedup = nseekfs_avg / other_avg
+                    print(f"  {other_lib.upper()} is {speedup:.1f}x faster than NSeekFS")
+                else:
+                    speedup = other_avg / nseekfs_avg
+                    print(f"  NSeekFS is {speedup:.1f}x faster than {other_lib.upper()}")
+        
+        # Library characteristics
+        print(f"\nLibrary Characteristics:")
+        characteristics = {
+            'nseekfs': "Rust-based, exact search, thread-safe, persistent indices",
+            'faiss': "Meta AI, highly optimized, exact mode, production-ready",
+            'annoy': "Spotify, tree-based, memory efficient, approximate but tunable",
+            'sklearn': "Python ecosystem, exact brute-force, well-integrated",
+            'numpy': "Raw computation baseline, no indexing overhead"
+        }
+        
+        for lib in all_successful:
+            if lib in characteristics:
+                print(f"  {lib.upper()}: {characteristics[lib]}")
+        
+        # Usage recommendations
+        print(f"\nUsage Recommendations:")
+        
+        fastest_lib = sorted_libs[0][0] if sorted_libs else None
+        
+        if 'nseekfs' in all_successful:
+            nseekfs_rank = next(i for i, (lib, _) in enumerate(sorted_libs, 1) if lib == 'nseekfs')
+            print(f"  NSeekFS ranked #{nseekfs_rank} in speed")
+            
+            if nseekfs_rank <= 2:
+                print(f"  - NSeekFS shows competitive performance")
+                print(f"  - Good choice for structured similarity search")
+            else:
+                print(f"  - NSeekFS prioritizes features over raw speed")
+                print(f"  - Consider for: thread safety, persistence, exact results")
+                print(f"  - For maximum speed: consider {fastest_lib.upper()}")
+        
+        print(f"  - For one-off queries: NumPy or fastest available")
+        print(f"  - For production systems: FAISS or NSeekFS")
+        print(f"  - For Python integration: scikit-learn")
+        print(f"  - For memory constraints: Annoy")
 
-Compares NSeekFS with native NumPy/SciPy implementations
-to demonstrate the advantages of the optimized Rust engine.
+def export_results(results: list, filename: str):
+    """Export results to JSON file"""
+    try:
+        with open(filename, 'w') as f:
+            json.dump({
+                'benchmark_type': 'similarity_search_comparison',
+                'description': 'Comparison of NSeekFS vs other similarity search libraries',
+                'libraries_tested': ['nseekfs', 'faiss', 'annoy', 'sklearn', 'numpy'],
+                'timestamp': time.time(),
+                'results': results
+            }, f, indent=2, default=str)
+        print(f"Results exported to: {filename}")
+    except Exception as e:
+        print(f"Export failed: {e}")
+
+def main():
+    """Main function"""
+    
+    parser = argparse.ArgumentParser(description='NSeekFS vs Similarity Search Libraries Benchmark')
+    parser.add_argument('--datasets', type=str, default='small,medium,large',
+                       help='Datasets to test (tiny,small,medium,large,xlarge,huge)')
+    parser.add_argument('--export', type=str, help='Export results to JSON file')
+    parser.add_argument('--install-missing', action='store_true', 
+                       help='Show install commands for missing libraries')
+    
+    args = parser.parse_args()
+    
+    # Show install commands if requested
+    if args.install_missing:
+        print("Install missing libraries:")
+        if not AVAILABLE_LIBS['faiss']:
+            print("  pip install faiss-cpu")
+        if not AVAILABLE_LIBS['annoy']:
+            print("  pip install annoy")
+        if not AVAILABLE_LIBS['sklearn']:
+            print("  pip install scikit-learn")
+        print("  pip install nseekfs")
+        return 0
+    
+    # Check NSeekFS availability
+    try:
+        import nseekfs
+        print(f"NSeekFS {getattr(nseekfs, '__version__', 'unknown')} available")
+    except ImportError:
+        print("ERROR: NSeekFS not found. Install with: pip install nseekfs")
+        return 1
+    
+    print(f"NumPy {np.__version__} available")
+    
+    # Show available libraries
+    available_count = sum(AVAILABLE_LIBS.values()) + 1  # +1 for nseekfs
+    total_libs = len(AVAILABLE_LIBS) + 1
+    print(f"Libraries available: {available_count}/{total_libs}")
+    
+    # Parse datasets
+    datasets = [d.strip() for d in args.datasets.split(',')]
+    
+    # Run benchmark
+    try:
+        benchmark = FairBenchmark()
+        
+        start_time = time.time()
+        results = benchmark.run_comprehensive_benchmark(datasets)
+        total_time = time.time() - start_time
+        
+        print(f"\nBenchmark completed in {total_time:.1f}s")
+        
+        # Export if requested
+        if args.export:
+            export_results(results, args.export)
+        
+        return 0
+        
+    except KeyboardInterrupt:
+        print("\nBenchmark interrupted by user")
+        return 2
+    except Exception as e:
+        print(f"\nBenchmark error: {e}")
+        import traceback
+        traceback.print_exc()
+        return 3#!/usr/bin/env python3
+"""
+NSeekFS Fair Cosine Similarity Benchmark
+========================================
+
+Fair comparison of NSeekFS vs similar indexing libraries for cosine similarity.
+Tests equivalent operations with structured similarity search libraries.
+
+Libraries tested:
+- NSeekFS (Rust-based exact search)  
+- FAISS (Meta AI, exact mode)
+- Annoy (Spotify, high precision mode)
+- scikit-learn NearestNeighbors (exact)
+- NumPy (baseline raw computation)
 
 Usage:
-    python benchmark_comparison.py [--datasets=small,medium,large] [--metrics=all] [--export=results.csv]
+    python fair_cosine_benchmark.py [--datasets=small,medium,large] [--export=results.json]
 """
 
 import time
 import numpy as np
 import argparse
-import csv
 import json
 import sys
 from typing import Dict, List, Tuple, Any
 import warnings
 warnings.filterwarnings('ignore')
 
+# Check library availability
+AVAILABLE_LIBS = {}
+
 try:
-    from scipy.spatial.distance import cdist
-    HAS_SCIPY = True
+    import faiss
+    AVAILABLE_LIBS['faiss'] = True
+    print("FAISS available")
 except ImportError:
-    HAS_SCIPY = False
-    print("⚠️ SciPy not found - some comparisons will be limited")
+    AVAILABLE_LIBS['faiss'] = False
 
-# Colors for output
-class Colors:
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    BLUE = '\033[94m'
-    MAGENTA = '\033[95m'
-    CYAN = '\033[96m'
-    BOLD = '\033[1m'
-    END = '\033[0m'
+try:
+    import annoy
+    AVAILABLE_LIBS['annoy'] = True
+    print("Annoy available")
+except ImportError:
+    AVAILABLE_LIBS['annoy'] = False
 
-def colored(text, color):
-    return f"{color}{text}{Colors.END}"
+try:
+    from sklearn.neighbors import NearestNeighbors
+    AVAILABLE_LIBS['sklearn'] = True
+    print("scikit-learn available")
+except ImportError:
+    AVAILABLE_LIBS['sklearn'] = False
 
-def print_header(title):
-    print("\n" + "="*70)
-    print(colored(f"🚀 {title}", Colors.BOLD + Colors.BLUE))
-    print("="*70)
+AVAILABLE_LIBS['numpy'] = True
 
-def print_result(message):
-    print(f"{colored('📊', Colors.CYAN)} {message}")
+def print_section(title: str):
+    print(f"\n{'='*60}")
+    print(f"{title}")
+    print(f"{'='*60}")
 
-def print_winner(message):
-    print(f"{colored('🏆', Colors.GREEN)} {message}")
+def print_test(message: str):
+    print(f"Testing: {message}")
 
-def print_benchmark(name, time_ms, qps, extra=""):
-    print(f"   {name:20s}: {time_ms:8.2f}ms  {qps:8.0f} QPS  {extra}")
+def print_result(message: str):
+    print(f"  {message}")
 
-class BenchmarkSuite:
-    """Complete comparative benchmarking suite"""
+class FairBenchmark:
+    """Fair benchmark comparing equivalent cosine similarity operations"""
     
     def __init__(self):
         self.results = []
+    
+    def numpy_cosine_similarity(self, query: np.ndarray, vectors: np.ndarray, top_k: int) -> Tuple[List[int], List[float], float]:
+        """NumPy implementation matching NSeekFS functionality"""
+        start_time = time.time()
         
-    def numpy_cosine_similarity(self, query: np.ndarray, vectors: np.ndarray, top_k: int = 10) -> Tuple[np.ndarray, np.ndarray]:
-        """NumPy implementation of cosine similarity"""
-        # Normalize
-        query_norm = query / np.linalg.norm(query)
-        vectors_norm = vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
+        # Normalize query and vectors (same as NSeekFS with normalized=True)
+        query_norm = query / (np.linalg.norm(query) + 1e-8)
+        vectors_norm = vectors / (np.linalg.norm(vectors, axis=1, keepdims=True) + 1e-8)
         
-        # Compute similarities
+        # Compute cosine similarities
         similarities = np.dot(vectors_norm, query_norm)
         
-        # Top-k
-        if top_k >= len(similarities):
-            indices = np.argsort(similarities)[::-1]
-        else:
-            indices = np.argpartition(similarities, -top_k)[-top_k:]
-            indices = indices[np.argsort(similarities[indices])][::-1]
+        # Get top-k results (same as NSeekFS)
+        top_indices = np.argsort(similarities)[-top_k:][::-1]
+        top_scores = similarities[top_indices]
         
-        return indices, similarities[indices]
+        query_time_ms = (time.time() - start_time) * 1000
+        
+        return top_indices.tolist(), top_scores.tolist(), query_time_ms
     
-    def numpy_dot_product(self, query: np.ndarray, vectors: np.ndarray, top_k: int = 10) -> Tuple[np.ndarray, np.ndarray]:
-        """NumPy implementation of dot product similarity"""
-        # Compute dot products
-        dot_products = np.dot(vectors, query)
+    def benchmark_faiss(self, vectors: np.ndarray, queries: List[np.ndarray], top_k: int) -> Dict[str, Any]:
+        """Benchmark FAISS exact search"""
+        if not AVAILABLE_LIBS['faiss']:
+            return {'success': False, 'error': 'FAISS not available'}
         
-        # Top-k (highest dot products)
-        if top_k >= len(dot_products):
-            indices = np.argsort(dot_products)[::-1]
-        else:
-            indices = np.argpartition(dot_products, -top_k)[-top_k:]
-            indices = indices[np.argsort(dot_products[indices])][::-1]
-        
-        return indices, dot_products[indices]
-    
-    def numpy_euclidean_distance(self, query: np.ndarray, vectors: np.ndarray, top_k: int = 10) -> Tuple[np.ndarray, np.ndarray]:
-        """NumPy implementation of Euclidean distance"""
-        # Compute squared distances (faster than sqrt)
-        diff = vectors - query[np.newaxis, :]
-        distances = np.sum(diff * diff, axis=1)
-        
-        # Top-k (smallest distances)
-        if top_k >= len(distances):
-            indices = np.argsort(distances)
-        else:
-            indices = np.argpartition(distances, top_k-1)[:top_k]
-            indices = indices[np.argsort(distances[indices])]
-        
-        return indices, distances[indices]
-    
-    def scipy_cosine_similarity(self, query: np.ndarray, vectors: np.ndarray, top_k: int = 10) -> Tuple[np.ndarray, np.ndarray]:
-        """SciPy implementation of cosine similarity"""
-        if not HAS_SCIPY:
-            return self.numpy_cosine_similarity(query, vectors, top_k)
-        
-        distances = cdist([query], vectors, metric='cosine')[0]
-        similarities = 1 - distances
-        
-        # Top-k
-        if top_k >= len(similarities):
-            indices = np.argsort(similarities)[::-1]
-        else:
-            indices = np.argpartition(similarities, -top_k)[-top_k:]
-            indices = indices[np.argsort(similarities[indices])][::-1]
-        
-        return indices, similarities[indices]
-    
-    def scipy_euclidean_distance(self, query: np.ndarray, vectors: np.ndarray, top_k: int = 10) -> Tuple[np.ndarray, np.ndarray]:
-        """SciPy implementation of Euclidean distance"""
-        if not HAS_SCIPY:
-            return self.numpy_euclidean_distance(query, vectors, top_k)
-        
-        distances = cdist([query], vectors, metric='euclidean')[0]
-        
-        # Top-k (smallest distances)
-        if top_k >= len(distances):
-            indices = np.argsort(distances)
-        else:
-            indices = np.argpartition(distances, top_k-1)[:top_k]
-            indices = indices[np.argsort(distances[indices])]
-        
-        return indices, distances[indices]
-    
-    def benchmark_metric(self, vectors: np.ndarray, queries: List[np.ndarray], 
-                        metric: str, top_k: int = 10) -> Dict[str, Any]:
-        """Benchmark a specific metric - NSeekFS v1.0 API only supports: vectors, normalize, verbose"""
-        
-        print(f"\n📍 Benchmarking {metric.upper()} similarity...")
-        print(f"   Dataset: {vectors.shape[0]:,} vectors × {vectors.shape[1]} dimensions")
-        print(f"   Top-K: {top_k}, Trials: {len(queries)}")
-        
-        results = {}
-        
-        # 1. Test NSeekFS (using actual API signature from __init__.py)
-        print(f"   🔧 Testing NSeekFS...")
         try:
-            import nseekfs
+            import faiss
             
-            # Create index - NSeekFS v1.0 API: from_embeddings(vectors, dims=None, normalize=True, verbose=False)
-            index_start = time.time()
-            # Only use parameters that exist in the real API
-            index = nseekfs.from_embeddings(vectors, normalized=True, verbose=False)
-            index_creation_time = time.time() - index_start
+            # Build exact index
+            build_start = time.time()
+            index = faiss.IndexFlatIP(vectors.shape[1])  # Inner Product for cosine
             
-            # Test for all metrics since NSeekFS uses cosine internally anyway
-            # Run queries
-            nseekfs_times = []
+            # Normalize vectors for cosine similarity
+            vectors_norm = vectors / (np.linalg.norm(vectors, axis=1, keepdims=True) + 1e-8)
+            index.add(vectors_norm)
+            build_time = (time.time() - build_start) * 1000
+            
+            # Warm-up
+            query_norm = queries[0] / (np.linalg.norm(queries[0]) + 1e-8)
+            index.search(query_norm.reshape(1, -1), top_k)
+            
+            # Benchmark
+            query_times = []
             for query in queries:
+                query_norm = query / (np.linalg.norm(query) + 1e-8)
                 start_time = time.time()
-                nseekfs_results = index.query(query, top_k=top_k)
+                scores, indices = index.search(query_norm.reshape(1, -1), top_k)
                 query_time = (time.time() - start_time) * 1000
-                nseekfs_times.append(query_time)
+                query_times.append(query_time)
             
-            results['nseekfs'] = {
-                'avg_time_ms': np.mean(nseekfs_times),
-                'std_time_ms': np.std(nseekfs_times),
-                'min_time_ms': np.min(nseekfs_times),
-                'max_time_ms': np.max(nseekfs_times),
-                'qps': 1000 / np.mean(nseekfs_times),
-                'index_creation_time_s': index_creation_time,
-                'simd_used': True,  # Assume SIMD for NSeekFS
-                'metric_note': f'NSeekFS uses cosine similarity internally (tested with {metric} comparison)'
+            return {
+                'success': True,
+                'build_time_ms': build_time,
+                'avg_time_ms': np.mean(query_times),
+                'std_time_ms': np.std(query_times),
+                'qps': 1000 / np.mean(query_times),
+                'all_times': query_times
             }
             
-            print_benchmark("NSeekFS", 
-                          results['nseekfs']['avg_time_ms'],
-                          results['nseekfs']['qps'],
-                          f"±{results['nseekfs']['std_time_ms']:.1f}")
-            
         except Exception as e:
-            print(f"   ❌ NSeekFS failed: {e}")
-            results['nseekfs'] = {'error': str(e)}
+            return {'success': False, 'error': str(e)}
+    
+    def benchmark_annoy(self, vectors: np.ndarray, queries: List[np.ndarray], top_k: int) -> Dict[str, Any]:
+        """Benchmark Annoy with high precision settings"""
+        if not AVAILABLE_LIBS['annoy']:
+            return {'success': False, 'error': 'Annoy not available'}
         
-        # 2. Test NumPy
-        print(f"   🔢 Testing NumPy...")
         try:
-            numpy_times = []
+            import annoy
             
-            if metric == 'cosine':
-                func = self.numpy_cosine_similarity
-            elif metric == 'dot':
-                func = self.numpy_dot_product
-            elif metric == 'euclidean':
-                func = self.numpy_euclidean_distance
-            else:
-                raise ValueError(f"Unsupported metric: {metric}")
+            # Build index with many trees for high precision
+            build_start = time.time()
+            index = annoy.AnnoyIndex(vectors.shape[1], 'angular')  # Angular = cosine
             
+            # Normalize vectors for cosine similarity
+            vectors_norm = vectors / (np.linalg.norm(vectors, axis=1, keepdims=True) + 1e-8)
+            for i, vector in enumerate(vectors_norm):
+                index.add_item(i, vector)
+            
+            n_trees = min(200, max(10, vectors.shape[0] // 100))  # Adaptive tree count
+            index.build(n_trees)
+            build_time = (time.time() - build_start) * 1000
+            
+            # Warm-up
+            query_norm = queries[0] / (np.linalg.norm(queries[0]) + 1e-8)
+            index.get_nns_by_vector(query_norm, top_k, search_k=-1)
+            
+            # Benchmark
+            query_times = []
             for query in queries:
+                query_norm = query / (np.linalg.norm(query) + 1e-8)
                 start_time = time.time()
-                indices, scores = func(query, vectors, top_k)
+                # search_k=-1 for exhaustive search (highest precision)
+                indices = index.get_nns_by_vector(query_norm, top_k, search_k=-1)
                 query_time = (time.time() - start_time) * 1000
-                numpy_times.append(query_time)
+                query_times.append(query_time)
             
-            results['numpy'] = {
-                'avg_time_ms': np.mean(numpy_times),
-                'std_time_ms': np.std(numpy_times),
-                'min_time_ms': np.min(numpy_times),
-                'max_time_ms': np.max(numpy_times),
-                'qps': 1000 / np.mean(numpy_times),
-                'simd_used': False
+            return {
+                'success': True,
+                'build_time_ms': build_time,
+                'avg_time_ms': np.mean(query_times),
+                'std_time_ms': np.std(query_times),
+                'qps': 1000 / np.mean(query_times),
+                'all_times': query_times,
+                'note': f'Built with {n_trees} trees, exhaustive search'
             }
             
-            print_benchmark("NumPy", 
-                          results['numpy']['avg_time_ms'],
-                          results['numpy']['qps'],
-                          f"±{results['numpy']['std_time_ms']:.1f}")
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def benchmark_sklearn(self, vectors: np.ndarray, queries: List[np.ndarray], top_k: int) -> Dict[str, Any]:
+        """Benchmark scikit-learn NearestNeighbors (exact)"""
+        if not AVAILABLE_LIBS['sklearn']:
+            return {'success': False, 'error': 'scikit-learn not available'}
+        
+        try:
+            from sklearn.neighbors import NearestNeighbors
+            
+            # Build exact index
+            build_start = time.time()
+            # Normalize vectors for cosine similarity
+            vectors_norm = vectors / (np.linalg.norm(vectors, axis=1, keepdims=True) + 1e-8)
+            
+            # Use 'cosine' metric for exact cosine similarity
+            nn = NearestNeighbors(n_neighbors=top_k, metric='cosine', algorithm='brute')
+            nn.fit(vectors_norm)
+            build_time = (time.time() - build_start) * 1000
+            
+            # Warm-up
+            query_norm = queries[0] / (np.linalg.norm(queries[0]) + 1e-8)
+            nn.kneighbors([query_norm])
+            
+            # Benchmark
+            query_times = []
+            for query in queries:
+                query_norm = query / (np.linalg.norm(query) + 1e-8)
+                start_time = time.time()
+                distances, indices = nn.kneighbors([query_norm])
+                query_time = (time.time() - start_time) * 1000
+                query_times.append(query_time)
+            
+            return {
+                'success': True,
+                'build_time_ms': build_time,
+                'avg_time_ms': np.mean(query_times),
+                'std_time_ms': np.std(query_times),
+                'qps': 1000 / np.mean(query_times),
+                'all_times': query_times
+            }
             
         except Exception as e:
-            print(f"   ❌ NumPy failed: {e}")
-            results['numpy'] = {'error': str(e)}
-        
-        # 3. Test SciPy (if available)
-        if HAS_SCIPY and metric in ['cosine', 'euclidean']:
-            print(f"   🔬 Testing SciPy...")
-            try:
-                scipy_times = []
-                
-                if metric == 'cosine':
-                    func = self.scipy_cosine_similarity
-                elif metric == 'euclidean':
-                    func = self.scipy_euclidean_distance
-                
-                for query in queries:
-                    start_time = time.time()
-                    indices, scores = func(query, vectors, top_k)
-                    query_time = (time.time() - start_time) * 1000
-                    scipy_times.append(query_time)
-                
-                results['scipy'] = {
-                    'avg_time_ms': np.mean(scipy_times),
-                    'std_time_ms': np.std(scipy_times),
-                    'min_time_ms': np.min(scipy_times),
-                    'max_time_ms': np.max(scipy_times),
-                    'qps': 1000 / np.mean(scipy_times),
-                    'simd_used': False
-                }
-                
-                print_benchmark("SciPy", 
-                              results['scipy']['avg_time_ms'],
-                              results['scipy']['qps'],
-                              f"±{results['scipy']['std_time_ms']:.1f}")
-                
-            except Exception as e:
-                print(f"   ❌ SciPy failed: {e}")
-                results['scipy'] = {'error': str(e)}
-        
-        # Analysis for this metric
-        print(f"\n   📊 Analysis for {metric}:")
-        
-        # Determine winner
-        valid_results = {k: v for k, v in results.items() if 'avg_time_ms' in v}
-        
-        if valid_results:
-            fastest = min(valid_results.keys(), key=lambda x: valid_results[x]['avg_time_ms'])
-            fastest_time = valid_results[fastest]['avg_time_ms']
-            
-            print(f"   🏆 Fastest: {fastest.upper()} ({fastest_time:.2f}ms)")
-            
-            # Calculate speedups
-            if 'nseekfs' in valid_results:
-                nseekfs_time = valid_results['nseekfs']['avg_time_ms']
-                for impl, data in valid_results.items():
-                    if impl != 'nseekfs':
-                        speedup = data['avg_time_ms'] / nseekfs_time
-                        if speedup > 1:
-                            print(f"   ⚡ NSeekFS is {speedup:.1f}x faster than {impl.upper()}")
-                        else:
-                            print(f"   📈 {impl.upper()} is {1/speedup:.1f}x faster than NSeekFS")
-            elif 'nseekfs' in results and 'skipped' in results['nseekfs']:
-                print(f"   ℹ️ NSeekFS: {results['nseekfs']['skipped']}")
-            elif 'nseekfs' in results and 'metric_note' in results['nseekfs']:
-                print(f"   ℹ️ Note: {results['nseekfs']['metric_note']}")
-        else:
-            print("   ❌ No valid results for comparison")
-        
-        return results
+            return {'success': False, 'error': str(e)}
     
-    def benchmark_dataset(self, dataset_name: str, n_vectors: int, dimensions: int, 
-                         num_queries: int = 5, metrics: List[str] = None, 
-                         top_k: int = 10) -> Dict[str, Any]:
-        """Complete benchmark of a dataset"""
+    def benchmark_cosine_similarity(self, vectors: np.ndarray, queries: List[np.ndarray], top_k: int = 10) -> Dict[str, Any]:
+        """Benchmark cosine similarity with all available libraries"""
         
-        print_header(f"DATASET: {dataset_name.upper()}")
+        n_vectors, dimensions = vectors.shape
+        num_queries = len(queries)
         
-        if metrics is None:
-            metrics = ['cosine', 'dot', 'euclidean']  # Test all metrics, but NSeekFS only optimized for cosine
-        
-        # Generate data
-        print_result(f"Generating {dataset_name} dataset: {n_vectors:,} × {dimensions}D...")
-        np.random.seed(42)  # Reproducibility
-        vectors = np.random.randn(n_vectors, dimensions).astype(np.float32)
-        queries = [np.random.randn(dimensions).astype(np.float32) for _ in range(num_queries)]
-        
-        data_size_mb = vectors.nbytes / (1024 * 1024)
-        print_result(f"   ✅ Generated {dataset_name}: {data_size_mb:.1f}MB")
+        print_test(f"Cosine similarity: {n_vectors:,} vectors x {dimensions}D, {num_queries} queries")
         
         results = {
-            'dataset_name': dataset_name,
             'n_vectors': n_vectors,
             'dimensions': dimensions,
             'num_queries': num_queries,
             'top_k': top_k,
-            'data_size_mb': data_size_mb,
-            'metrics': {}
         }
         
-        # Benchmark for each metric
-        for metric in metrics:
-            print_result(f"\n📍 Benchmarking {metric.upper()} similarity...")
-            metric_results = self.benchmark_metric(vectors, queries, metric, top_k)
-            results['metrics'][metric] = metric_results
+        # Test all available libraries
+        libraries_to_test = [
+            ('nseekfs', self.benchmark_nseekfs),
+            ('faiss', self.benchmark_faiss),
+            ('annoy', self.benchmark_annoy), 
+            ('sklearn', self.benchmark_sklearn),
+            ('numpy', self.benchmark_numpy_baseline)
+        ]
+        
+        for lib_name, benchmark_func in libraries_to_test:
+            if lib_name == 'nseekfs':
+                # Always test NSeekFS if available
+                try:
+                    import nseekfs
+                except ImportError:
+                    results[lib_name] = {'success': False, 'error': 'NSeekFS not available'}
+                    continue
+            elif lib_name != 'numpy' and not AVAILABLE_LIBS.get(lib_name, False):
+                results[lib_name] = {'success': False, 'error': f'{lib_name} not available'}
+                continue
+            
+            print_result(f"{lib_name.upper()}...")
+            try:
+                result = benchmark_func(vectors, queries, top_k)
+                results[lib_name] = result
+                
+                if result.get('success', True):
+                    build_time = result.get('build_time_ms', 0)
+                    avg_time = result.get('avg_time_ms', 0)
+                    qps = result.get('qps', 0)
+                    
+                    print_result(f"  Build: {build_time:.1f}ms")
+                    print_result(f"  Query: {avg_time:.2f}ms avg ({qps:.0f} QPS)")
+                    
+                    if 'note' in result:
+                        print_result(f"  Note: {result['note']}")
+                else:
+                    print_result(f"  FAILED: {result.get('error', 'Unknown error')}")
+                    
+            except Exception as e:
+                print_result(f"  ERROR: {e}")
+                results[lib_name] = {'success': False, 'error': str(e)}
+        
+        # Analysis
+        self.analyze_library_comparison(results)
         
         return results
     
-    def run_comprehensive_benchmark(self, datasets: List[str] = None, 
-                                  metrics: List[str] = None, 
-                                  top_k: int = 10) -> List[Dict[str, Any]]:
-        """Run comprehensive benchmark suite"""
+    def benchmark_nseekfs(self, vectors: np.ndarray, queries: List[np.ndarray], top_k: int) -> Dict[str, Any]:
+        """Benchmark NSeekFS"""
+        try:
+            import nseekfs
+            
+            # Build index
+            build_start = time.time()
+            index = nseekfs.from_embeddings(vectors, normalized=True, verbose=False)
+            build_time = (time.time() - build_start) * 1000
+            
+            # Warm-up
+            index.query(queries[0], top_k=top_k)
+            
+            # Benchmark
+            query_times = []
+            for query in queries:
+                start_time = time.time()
+                result = index.query(query, top_k=top_k)
+                query_time = (time.time() - start_time) * 1000
+                query_times.append(query_time)
+            
+            return {
+                'success': True,
+                'build_time_ms': build_time,
+                'avg_time_ms': np.mean(query_times),
+                'std_time_ms': np.std(query_times),
+                'qps': 1000 / np.mean(query_times),
+                'all_times': query_times
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def benchmark_numpy_baseline(self, vectors: np.ndarray, queries: List[np.ndarray], top_k: int) -> Dict[str, Any]:
+        """Benchmark NumPy baseline (equivalent operations)"""
+        try:
+            # Warm-up
+            self.numpy_cosine_similarity(queries[0], vectors, top_k)
+            
+            # Benchmark
+            query_times = []
+            for query in queries:
+                _, _, query_time = self.numpy_cosine_similarity(query, vectors, top_k)
+                query_times.append(query_time)
+            
+            return {
+                'success': True,
+                'build_time_ms': 0.0,  # No build phase
+                'avg_time_ms': np.mean(query_times),
+                'std_time_ms': np.std(query_times),
+                'qps': 1000 / np.mean(query_times),
+                'all_times': query_times
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def analyze_library_comparison(self, results: Dict[str, Any]):
+        """Analyze comparison between libraries"""
+        successful = {k: v for k, v in results.items() 
+                     if isinstance(v, dict) and v.get('success', False)}
+        
+        if len(successful) < 2:
+            print_result("Not enough successful results for comparison")
+            return
+        
+        # Sort by query speed
+        sorted_by_speed = sorted(successful.items(), 
+                               key=lambda x: x[1]['avg_time_ms'])
+        
+        print_result("\nRanking by query speed:")
+        for i, (lib, data) in enumerate(sorted_by_speed, 1):
+            time_ms = data['avg_time_ms']
+            qps = data['qps']
+            
+            if i == 1:
+                print_result(f"  🥇 {lib.upper()}: {time_ms:.2f}ms ({qps:.0f} QPS)")
+            elif i == 2:
+                print_result(f"  🥈 {lib.upper()}: {time_ms:.2f}ms ({qps:.0f} QPS)")
+            elif i == 3:
+                print_result(f"  🥉 {lib.upper()}: {time_ms:.2f}ms ({qps:.0f} QPS)")
+            else:
+                print_result(f"  {i}. {lib.upper()}: {time_ms:.2f}ms ({qps:.0f} QPS)")
+        
+        # Build time comparison (excluding NumPy)
+        with_build = {k: v for k, v in successful.items() 
+                     if v.get('build_time_ms', 0) > 0}
+        
+        if with_build:
+            print_result("\nBuild time comparison:")
+            sorted_by_build = sorted(with_build.items(), 
+                                   key=lambda x: x[1]['build_time_ms'])
+            for lib, data in sorted_by_build:
+                print_result(f"  {lib.upper()}: {data['build_time_ms']:.1f}ms")
+        
+        # NSeekFS specific analysis
+        if 'nseekfs' in successful:
+            nseekfs_time = successful['nseekfs']['avg_time_ms']
+            print_result(f"\nNSeekFS comparison:")
+            
+            for lib, data in successful.items():
+                if lib != 'nseekfs':
+                    lib_time = data['avg_time_ms']
+                    if lib_time < nseekfs_time:
+                        speedup = nseekfs_time / lib_time
+                        print_result(f"  {lib.upper()} is {speedup:.1f}x faster than NSeekFS")
+                    else:
+                        speedup = lib_time / nseekfs_time
+                        print_result(f"  NSeekFS is {speedup:.1f}x faster than {lib.upper()}")
+    
+    def run_comprehensive_benchmark(self, datasets: List[str] = None) -> List[Dict[str, Any]]:
+        """Run comprehensive benchmark with different dataset sizes"""
         
         if datasets is None:
             datasets = ['small', 'medium', 'large']
         
-        if metrics is None:
-            metrics = ['cosine', 'dot', 'euclidean']  # Test all metrics
-        
-        # Dataset configurations
+        # Dataset configurations - focus on where NSeekFS should excel
         dataset_configs = {
-            'tiny': {'n_vectors': 1000, 'dimensions': 128, 'num_queries': 10},
-            'small': {'n_vectors': 5000, 'dimensions': 256, 'num_queries': 20},
+            'tiny': {'n_vectors': 1000, 'dimensions': 128, 'num_queries': 20},
+            'small': {'n_vectors': 5000, 'dimensions': 256, 'num_queries': 15},
             'medium': {'n_vectors': 25000, 'dimensions': 384, 'num_queries': 10},
-            'large': {'n_vectors': 100000, 'dimensions': 512, 'num_queries': 5},
-            'xlarge': {'n_vectors': 250000, 'dimensions': 768, 'num_queries': 3},
-            'extreme': {'n_vectors': 500000, 'dimensions': 1024, 'num_queries': 2}
+            'large': {'n_vectors': 100000, 'dimensions': 512, 'num_queries': 8},
+            'xlarge': {'n_vectors': 250000, 'dimensions': 768, 'num_queries': 5},
+            'huge': {'n_vectors': 500000, 'dimensions': 1024, 'num_queries': 3}
         }
+        
+        print_section("NSeekFS VS SIMILARITY SEARCH LIBRARIES")
+        print(f"Testing datasets: {', '.join(datasets)}")
+        print(f"Libraries: NSeekFS, FAISS, Annoy, scikit-learn, NumPy baseline")
+        print(f"Focus: Structured similarity search comparison")
+        
+        # Check which libraries are available
+        available_libs = []
+        for lib, available in AVAILABLE_LIBS.items():
+            if available:
+                available_libs.append(lib)
+        
+        try:
+            import nseekfs
+            available_libs.append('nseekfs')
+        except ImportError:
+            pass
+            
+        print(f"Available: {', '.join(available_libs)}")
         
         all_results = []
         
-        print_header("🚀 COMPREHENSIVE BENCHMARK SUITE")
-        print_result(f"Testing datasets: {', '.join(datasets)}")
-        print_result(f"Testing metrics: {', '.join(metrics)}")
-        print_result(f"Top-K: {top_k}")
-        
         for dataset_name in datasets:
             if dataset_name not in dataset_configs:
-                print(f"⚠️ Unknown dataset: {dataset_name}")
+                print(f"Unknown dataset: {dataset_name}")
                 continue
-                
+            
             config = dataset_configs[dataset_name]
             
+            print_section(f"DATASET: {dataset_name.upper()}")
+            
             try:
-                result = self.benchmark_dataset(
-                    dataset_name=dataset_name,
-                    n_vectors=config['n_vectors'],
-                    dimensions=config['dimensions'],
-                    num_queries=config['num_queries'],
-                    metrics=metrics,
-                    top_k=top_k
-                )
+                # Generate reproducible data
+                np.random.seed(42)
+                vectors = np.random.randn(config['n_vectors'], config['dimensions']).astype(np.float32)
+                queries = [np.random.randn(config['dimensions']).astype(np.float32) 
+                          for _ in range(config['num_queries'])]
+                
+                data_size_mb = vectors.nbytes / (1024 * 1024)
+                print(f"Generated: {config['n_vectors']:,} vectors x {config['dimensions']}D ({data_size_mb:.1f}MB)")
+                
+                # Run benchmark
+                result = self.benchmark_cosine_similarity(vectors, queries, top_k=10)
+                result['dataset_name'] = dataset_name
+                result['data_size_mb'] = data_size_mb
+                
                 all_results.append(result)
                 self.results.append(result)
                 
             except Exception as e:
-                print(f"❌ Error in dataset {dataset_name}: {e}")
+                print(f"Error in dataset {dataset_name}: {e}")
                 import traceback
                 traceback.print_exc()
         
-        # Generate final analysis
-        self.print_final_analysis()
+        # Generate analysis
+        self.print_analysis()
         
         return all_results
     
-    def print_final_analysis(self) -> None:
-        """Generate summary report of benchmarks"""
+    def print_analysis(self):
+        """Print comprehensive analysis of results"""
         
-        print_header("📈 FINAL ANALYSIS")
+        print_section("COMPREHENSIVE ANALYSIS")
         
         if not self.results:
-            print("❌ No results available")
+            print("No results to analyze")
             return
         
-        # General analysis
-        total_tests = sum(len(r['metrics']) for r in self.results)
-        print_result(f"Total tests executed: {total_tests}")
-        print_result(f"Datasets tested: {len(self.results)}")
+        successful_results = [r for r in self.results if r.get('nseekfs', {}).get('success') and r.get('numpy', {}).get('success')]
         
-        # Analysis by metric
-        metrics_analysis = {}
+        if not successful_results:
+            print("No successful comparisons to analyze")
+            return
         
-        for result in self.results:
-            for metric, metric_data in result['metrics'].items():
-                if metric not in metrics_analysis:
-                    metrics_analysis[metric] = {
-                        'nseekfs_wins': 0,
-                        'numpy_wins': 0,
-                        'scipy_wins': 0,
-                        'total_tests': 0,
-                        'speedups': []
-                    }
-                
-                # Determine winner
-                times = {}
-                for impl in ['nseekfs', 'numpy', 'scipy']:
-                    if impl in metric_data and isinstance(metric_data[impl], dict) and 'avg_time_ms' in metric_data[impl]:
-                        times[impl] = metric_data[impl]['avg_time_ms']
-                
-                if times:
-                    winner = min(times.keys(), key=lambda x: times[x])
-                    metrics_analysis[metric][f'{winner}_wins'] += 1
-                    metrics_analysis[metric]['total_tests'] += 1
-                    
-                    # Calculate NSeekFS speedup vs best alternative
-                    if 'nseekfs' in times:
-                        nseekfs_time = times['nseekfs']
-                        other_times = [t for k, t in times.items() if k != 'nseekfs']
-                        if other_times:
-                            best_other_time = min(other_times)
-                            speedup = best_other_time / nseekfs_time
-                            metrics_analysis[metric]['speedups'].append(speedup)
+        print(f"Successful tests: {len(successful_results)}/{len(self.results)}")
         
-        # Print metric analysis
-        for metric, analysis in metrics_analysis.items():
-            print_result(f"\n🎯 {metric.upper()} Similarity Results:")
-            print(f"   NSeekFS wins: {analysis['nseekfs_wins']}/{analysis['total_tests']}")
-            print(f"   NumPy wins: {analysis['numpy_wins']}/{analysis['total_tests']}")
-            print(f"   SciPy wins: {analysis['scipy_wins']}/{analysis['total_tests']}")
+        # Win/loss analysis
+        nseekfs_wins = sum(1 for r in successful_results if r.get('winner') == 'nseekfs')
+        numpy_wins = sum(1 for r in successful_results if r.get('winner') == 'numpy')
+        
+        print(f"\nQuery Speed Results:")
+        print(f"  NSeekFS wins: {nseekfs_wins}/{len(successful_results)}")
+        print(f"  NumPy wins: {numpy_wins}/{len(successful_results)}")
+        
+        # Performance trends
+        print(f"\nPerformance by dataset size:")
+        for result in successful_results:
+            dataset = result['dataset_name']
+            n_vectors = result['n_vectors']
+            winner = result.get('winner', 'tie')
+            speedup = result.get('speedup', 1.0)
             
-            if analysis['speedups']:
-                avg_speedup = np.mean(analysis['speedups'])
-                max_speedup = np.max(analysis['speedups'])
-                print(f"   Average NSeekFS speedup: {avg_speedup:.1f}x")
-                print(f"   Maximum NSeekFS speedup: {max_speedup:.1f}x")
-        
-        # Overall conclusion
-        total_nseekfs_wins = sum(a['nseekfs_wins'] for a in metrics_analysis.values())
-        total_benchmarks = sum(a['total_tests'] for a in metrics_analysis.values())
-        
-        if total_benchmarks > 0:
-            win_rate = (total_nseekfs_wins / total_benchmarks) * 100
-            
-            print_header("🏆 OVERALL CONCLUSION")
-            print_result(f"NSeekFS win rate: {win_rate:.1f}% ({total_nseekfs_wins}/{total_benchmarks})")
-            
-            if win_rate >= 80:
-                print_winner("🚀 NSeekFS consistently outperforms alternatives!")
-            elif win_rate >= 60:
-                print_winner("⚡ NSeekFS shows strong performance advantages")
-            elif win_rate >= 40:
-                print_result("📊 NSeekFS shows competitive performance")
+            if winner == 'numpy':
+                print(f"  {dataset} ({n_vectors:,} vectors): NumPy {speedup:.1f}x faster")
+            elif winner == 'nseekfs':
+                print(f"  {dataset} ({n_vectors:,} vectors): NSeekFS {speedup:.1f}x faster")
             else:
-                print_result("📈 NSeekFS has room for optimization")
+                print(f"  {dataset} ({n_vectors:,} vectors): Tie")
         
-        print_result(f"\n💡 Key Features of NSeekFS v1.0:")
-        print_result("   • Rust-powered performance with SIMD optimizations")
-        print_result("   • Exact cosine similarity search (100% precision)")
-        print_result("   • Memory-efficient index structures")
-        print_result("   • Thread-safe concurrent access")
-        print_result("   • Production-ready with robust error handling")
-        print_result("   • Future versions will support additional metrics")
-
-def export_results(results: List[Dict[str, Any]], filename: str) -> None:
-    """Export benchmark results to file"""
-    
-    file_ext = filename.lower().split('.')[-1]
-    
-    if file_ext == 'json':
-        with open(filename, 'w') as f:
-            json.dump(results, f, indent=2, default=str)
-        print_result(f"Results exported to {filename}")
-    
-    elif file_ext == 'csv':
-        # Flatten results for CSV
-        flattened_results = []
+        # NSeekFS strengths analysis
+        print(f"\nNSeekFS Advantages (regardless of raw speed):")
+        print(f"  - Exact results (100% precision)")
+        print(f"  - Built-in indexing and persistence")
+        print(f"  - Thread-safe concurrent access")
+        print(f"  - Memory-efficient for large datasets")
+        print(f"  - Rust-based numerical stability")
         
-        for result in results:
-            base_info = {
-                'dataset_name': result['dataset_name'],
-                'n_vectors': result['n_vectors'],
-                'dimensions': result['dimensions'],
-                'data_size_mb': result['data_size_mb']
-            }
-            
-            for metric, metric_data in result['metrics'].items():
-                for impl, impl_data in metric_data.items():
-                    if isinstance(impl_data, dict) and 'avg_time_ms' in impl_data:
-                        row = {
-                            **base_info,
-                            'metric': metric,
-                            'implementation': impl,
-                            'avg_time_ms': impl_data['avg_time_ms'],
-                            'qps': impl_data['qps'],
-                            'std_time_ms': impl_data.get('std_time_ms', 0)
-                        }
-                        flattened_results.append(row)
+        # Usage recommendations
+        print(f"\nUsage Recommendations:")
         
-        if flattened_results:
-            with open(filename, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=flattened_results[0].keys())
-                writer.writeheader()
-                writer.writerows(flattened_results)
-            print_result(f"Results exported to {filename}")
+        if numpy_wins > nseekfs_wins:
+            print(f"  - For simple one-off queries: NumPy may be faster")
+            print(f"  - For repeated queries on same dataset: NSeekFS provides benefits")
+            print(f"  - For production systems: NSeekFS offers better structure")
         else:
-            print("❌ No results to export")
-    
-    else:
-        print(f"❌ Unsupported export format: {file_ext}. Use .json or .csv")
+            print(f"  - NSeekFS shows competitive or better performance")
+            print(f"  - Recommended for most similarity search use cases")
+        
+        print(f"  - Consider build time amortization over multiple queries")
+        print(f"  - Thread safety important for concurrent applications")
 
-def run_quick_comparison():
-    """Quick comparison for testing"""
-    print_header("QUICK COMPARISON")
-    
+def export_results(results: List[Dict[str, Any]], filename: str):
+    """Export results to JSON file"""
     try:
-        import nseekfs
-        
-        # Small dataset for quick test
-        vectors = np.random.randn(5000, 256).astype(np.float32)
-        query = np.random.randn(256).astype(np.float32)
-        
-        print_result(f"Dataset: {vectors.shape[0]:,} vectors × {vectors.shape[1]}D")
-        
-        # NSeekFS (using real API signature)
-        print_result("Testing NSeekFS...")
-        start_time = time.time()
-        index = nseekfs.from_embeddings(vectors, normalized=True, verbose=False)
-        build_time = time.time() - start_time
-        
-        start_time = time.time()
-        results = index.query(query, top_k=10)
-        nseekfs_time = (time.time() - start_time) * 1000
-        
-        # NumPy
-        print_result("Testing NumPy...")
-        query_norm = query / np.linalg.norm(query)
-        vectors_norm = vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
-        
-        start_time = time.time()
-        similarities = np.dot(vectors_norm, query_norm)
-        top_indices = np.argpartition(similarities, -10)[-10:]
-        numpy_time = (time.time() - start_time) * 1000
-        
-        # Results
-        print_result(f"\n🏆 Results:")
-        print_benchmark("NSeekFS", nseekfs_time, 1000/nseekfs_time)
-        print_benchmark("NumPy", numpy_time, 1000/numpy_time)
-        
-        speedup = numpy_time / nseekfs_time
-        if speedup > 1:
-            print_winner(f"🚀 NSeekFS is {speedup:.1f}x faster!")
-        else:
-            print_result(f"NumPy is {1/speedup:.1f}x faster")
-        
-        print_result(f"💾 NSeekFS memory usage: {index.memory_usage_mb:.1f}MB")
-        
-    except ImportError:
-        print("❌ NSeekFS not found")
+        with open(filename, 'w') as f:
+            json.dump({
+                'benchmark_type': 'fair_cosine_similarity',
+                'description': 'Fair comparison of NSeekFS vs NumPy for cosine similarity',
+                'timestamp': time.time(),
+                'results': results
+            }, f, indent=2, default=str)
+        print(f"Results exported to: {filename}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Export failed: {e}")
 
 def main():
     """Main function"""
     
-    parser = argparse.ArgumentParser(description='NSeekFS v1.0 Comparative Benchmark')
-    parser.add_argument('--datasets', type=str, default='small,medium',
-                       help='Datasets to test (tiny,small,medium,large,xlarge,extreme)')
-    parser.add_argument('--metrics', type=str, default='cosine,dot,euclidean',
-                       help='Metrics to test (cosine,dot,euclidean)')
-    parser.add_argument('--top-k', type=int, default=10, help='Number of top-k results')
-    parser.add_argument('--export', type=str, help='Export results (filename.json or filename.csv)')
-    parser.add_argument('--quick', action='store_true', help='Quick comparison only')
+    parser = argparse.ArgumentParser(description='Fair NSeekFS Cosine Similarity Benchmark')
+    parser.add_argument('--datasets', type=str, default='small,medium,large',
+                       help='Datasets to test (tiny,small,medium,large,xlarge,huge)')
+    parser.add_argument('--export', type=str, help='Export results to JSON file')
     
     args = parser.parse_args()
     
-    print(colored("🚀 NSEEKFS v1.0 - COMPREHENSIVE BENCHMARK", Colors.BOLD + Colors.BLUE))
-    print(colored("=" * 70, Colors.BLUE))
-    
-    if args.quick:
-        run_quick_comparison()
-        return 0
-    
-    # Parse arguments
-    datasets = [d.strip() for d in args.datasets.split(',')]
-    metrics = [m.strip() for m in args.metrics.split(',')]
-    
-    # Check dependencies
+    # Check NSeekFS availability
     try:
         import nseekfs
-        print_result(f"✅ NSeekFS v{getattr(nseekfs, '__version__', '1.0.0')} available")
+        print(f"NSeekFS {getattr(nseekfs, '__version__', 'unknown')} available")
     except ImportError:
-        print("❌ NSeekFS not found. Install with: pip install nseekfs")
+        print("ERROR: NSeekFS not found. Install with: pip install nseekfs")
         return 1
     
-    print_result(f"✅ NumPy {np.__version__} available")
+    print(f"NumPy {np.__version__} available")
     
-    if HAS_SCIPY:
-        import scipy
-        print_result(f"✅ SciPy {scipy.__version__} available")
-    else:
-        print_result("⚠️ SciPy not available - some comparisons limited")
+    # Parse datasets
+    datasets = [d.strip() for d in args.datasets.split(',')]
     
-    # Run benchmarks
+    # Run benchmark
     try:
-        suite = BenchmarkSuite()
+        benchmark = FairBenchmark()
         
         start_time = time.time()
-        results = suite.run_comprehensive_benchmark(datasets=datasets, metrics=metrics, top_k=args.top_k)
+        results = benchmark.run_comprehensive_benchmark(datasets)
         total_time = time.time() - start_time
         
-        print_result(f"\n⏱️ Total benchmark time: {total_time:.1f}s")
+        print(f"\nBenchmark completed in {total_time:.1f}s")
         
         # Export if requested
         if args.export:
             export_results(results, args.export)
         
-        print_result(f"\n✅ Comparative benchmark completed!")
         return 0
         
     except KeyboardInterrupt:
-        print("\n⚠️ Benchmark interrupted by user")
+        print("\nBenchmark interrupted by user")
         return 2
     except Exception as e:
-        print(f"\n❌ Benchmark error: {e}")
+        print(f"\nBenchmark error: {e}")
         import traceback
         traceback.print_exc()
         return 3
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    sys.exit(main())

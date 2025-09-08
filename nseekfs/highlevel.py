@@ -182,7 +182,9 @@ class SearchEngine:
         return self.query(query_vector, top_k, format="detailed")
     
     def query_batch(self, queries: np.ndarray, top_k: int = 10, format: str = "simple") -> List:
-        """Batch querying convenience method (iterates per row)."""
+        """Batch querying with Rust optimizations - automatically selects best strategy."""
+        
+        # Input validation
         if not isinstance(queries, np.ndarray):
             queries = np.asarray(queries, dtype=np.float32)
             
@@ -195,12 +197,61 @@ class SearchEngine:
         if queries.shape[1] != self.dims:
             raise ValueError(f"Query dimensions {queries.shape[1]} != index dimensions {self.dims}")
         
-        # Fallback: process individually
-        results = []
-        for i in range(queries.shape[0]):
-            result = self.query(queries[i], top_k, format=format)
-            results.append(result)
-        return results
+        # Empty batch handling
+        if queries.shape[0] == 0:
+            return []
+        
+        # ✅ OTIMIZAÇÃO: O lib.rs query_batch() já tem toda a lógica de seleção automática:
+        # - ≥100 queries: chunking com query_batch_large_internal()
+        # - 20-99 queries + dims≥16: SIMD com query_batch_vectorized_internal() 
+        # - <20 queries: loop otimizado com query_batch_simple_optimized_internal()
+        rust_results = self._engine.query_batch(queries, top_k)
+        
+        # Converter resultados conforme formato solicitado
+        if format == "simple":
+            # Formato: List[List[Dict]] - uma lista de resultados por query
+            return [
+                [{'idx': item.idx, 'score': item.score} for item in result.results]
+                for result in rust_results
+            ]
+            
+        elif format == "detailed":
+            # Formato: List[Dict] - informações detalhadas por query
+            return [
+                {
+                    'results': [{'idx': item.idx, 'score': item.score} for item in result.results],
+                    'query_time_ms': result.query_time_ms,
+                    'method_used': result.method_used,
+                    'candidates_examined': result.candidates_generated,
+                    'simd_used': result.simd_used,
+                    'parse_time_ms': result.parse_time_ms,
+                    'compute_time_ms': result.compute_time_ms,
+                    'sort_time_ms': result.sort_time_ms
+                }
+                for result in rust_results
+            ]
+            
+        elif format == "legacy":
+            # Formato: List[List[Tuple]] - compatibilidade com versões antigas
+            return [
+                [(item.idx, item.score) for item in result.results]
+                for result in rust_results
+            ]
+            
+        else:
+            raise ValueError(f"Unknown format: {format}. Use 'simple', 'detailed', or 'legacy'")
+
+    def get_batch_performance_summary(self) -> Dict[str, Any]:
+        """Obter métricas de performance do batch processing."""
+        try:
+            # Obter métricas do Rust engine (que já inclui batch stats)
+            return self._engine.get_performance_metrics()
+        except (AttributeError, Exception):
+            # Fallback simples
+            return {
+                'message': 'Batch performance metrics not available',
+                'suggestion': 'Update to latest NSeekFS version for detailed metrics'
+            }
     
     def get_performance_metrics(self) -> Dict[str, Any]:
         """Return aggregated performance metrics if available."""

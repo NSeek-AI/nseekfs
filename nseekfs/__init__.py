@@ -20,8 +20,8 @@ Verbose Mode:
     results = index.query(query_vector, top_k=10)  # Shows detailed logs
 
 Control Normalization:
-    # Disable normalization if vectors are already normalized
-    index = nseekfs.from_embeddings(vectors, normalized=False, verbose=False)
+    # If vectors are already normalized
+    index = nseekfs.from_embeddings(vectors, normalized=True, verbose=False)
 """
 
 import sys
@@ -30,7 +30,7 @@ from importlib import import_module
 from typing import Any, Dict, List, Optional, Union
 
 
-__version__ = "1.0.0"
+__version__ = "1.0.2"
 __author__ = "Diogo Novo"
 __email__ = "contact@nseek.io"
 __license__ = "MIT"
@@ -75,7 +75,7 @@ def from_embeddings(vectors, normalized=True, verbose=False):
 
 def from_bin(bin_file_path, verbose=False):
     """Load index from binary file"""
-    return _hl().from_bin(bin_file_path, verbose=verbose)
+    return _hl().load_index(bin_file_path, verbose=verbose)
 
 
 def health_check(quick=True, verbose=True):
