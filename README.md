@@ -8,6 +8,18 @@
 
 Fast and exact cosine similarity search for Python. Built with Rust for performance, designed for production use.
 
+---
+
+NSeekFS combines the safety and performance of Rust with a clean Python API.  
+This first release focuses on **exact cosine search with SIMD acceleration**, providing predictable and reproducible results for ML workloads.  
+
+Upcoming releases will expand support to:
+- Euclidean distance
+- Approximate Nearest Neighbor (ANN) search
+- Additional precision levels and memory optimizations
+
+Our goal: deliver a **fast, reliable, and production-ready search engine** that evolves with your needs.
+
 ```bash
 pip install nseekfs
 ```
@@ -27,6 +39,8 @@ embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
 query = query / np.linalg.norm(query)
 
 # Build index and run a search
+#By default, from_embeddings assumes vectors normalized (normalized=True). 
+#If your vectors are not normalized, set normalized=False and NSeekFS will handle it internally
 index = nseekfs.from_embeddings(embeddings, normalized=True)
 results = index.query(query, top_k=10)
 
@@ -178,3 +192,4 @@ MIT License - see LICENSE file for details.
 **Fast, exact cosine similarity search for Python.**
 
 *Built with Rust for performance, designed for Python developers.*
+Source: [github.com/NSeek-AI/nseekfs](https://github.com/NSeek-AI/nseekfs)

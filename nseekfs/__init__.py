@@ -19,9 +19,6 @@ Verbose Mode:
     index = nseekfs.from_embeddings(vectors, normalized=True, verbose=True)
     results = index.query(query_vector, top_k=10)  # Shows detailed logs
 
-Control Normalization:
-    # If vectors are already normalized
-    index = nseekfs.from_embeddings(vectors, normalized=True, verbose=False)
 """
 
 import sys
@@ -30,7 +27,7 @@ from importlib import import_module
 from typing import Any, Dict, List, Optional, Union
 
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __author__ = "Diogo Novo"
 __email__ = "contact@nseek.io"
 __license__ = "MIT"
@@ -60,7 +57,7 @@ def _ll():
     try:
         return import_module("nseekfs.nseekfs")
     except ImportError as e:
-        raise ImportError(f"Failed to import nseekfs.nseekfs: {e}. Please ensure the Rust extension is compiled.")
+        raise ImportError(f"Failed to import nseekfs.nseekfs: {e}.")
 
 
 # Check compatibility at import
@@ -80,7 +77,7 @@ def from_bin(bin_file_path, verbose=False):
 
 def health_check(quick=True, verbose=True):
     """Run system health check"""
-    return _hl().health_check(quick=quick, verbose=verbose)
+    return _ll().health_check(quick=quick, verbose=verbose)
 
 
 def benchmark(vectors=1000, dims=384, queries=100, verbose=True):
@@ -94,6 +91,10 @@ def benchmark(vectors=1000, dims=384, queries=100, verbose=True):
     data_start = time.time()
     test_vectors = np.random.randn(vectors, dims).astype(np.float32)
     test_queries = np.random.randn(queries, dims).astype(np.float32)
+
+    test_vectors /= np.linalg.norm(test_vectors, axis=1, keepdims=True)
+    test_queries /= np.linalg.norm(test_queries, axis=1, keepdims=True)
+
     data_gen_time = time.time() - data_start
     
     # Build index
@@ -172,8 +173,13 @@ SearchConfig = _LazyClass(_get_search_config_class)
 PySearchEngine = _LazyClass(_get_pysearchengine_class)
 
 # Compatibility aliases
-build_from_embeddings = from_embeddings  # v1.0 compat
-build_from_bin = from_bin  # v1.0 compat
+build_from_embeddings = from_embeddings
+build_index = from_embeddings 
+from_vectors = from_embeddings
+fit_embeddings = from_embeddings
+build_from_bin = from_bin
+load_index = from_bin
+read_index = from_bin
 
 # Show version info in interactive sessions
 if hasattr(sys, 'ps1') or hasattr(sys, 'ps2'):
@@ -205,7 +211,12 @@ __all__ = [
     
     # Compatibility
     'build_from_embeddings',
+    'build_index',
+    'from_vectors',
+    'fit_embeddings',
     'build_from_bin',
+    'load_index',
+    'read_index',
     
     # Metadata
     '__version__',
