@@ -1,24 +1,11 @@
 """
-NSeekFS v1.0 - High-Performance Exact Vector Search
-==================================================
+NSeekFS v1.0 - Exact Vector Search
+==================================
 
-v1.0 Features:
-- Simplified API (clean and efficient)
-- Built-in verbose logging and timing
-
-Simple Usage:
+Quick usage:
     import nseekfs
-    
-    # Simple API
     index = nseekfs.from_embeddings(vectors, normalized=True, verbose=False)
     results = index.query(query_vector, top_k=10)
-    # Returns: [{'idx': 0, 'score': 0.95}, ...]
-
-Verbose Mode:
-    # Enable detailed logging 
-    index = nseekfs.from_embeddings(vectors, normalized=True, verbose=True)
-    results = index.query(query_vector, top_k=10)  # Shows detailed logs
-
 """
 
 import sys
@@ -26,48 +13,44 @@ import warnings
 from importlib import import_module
 from typing import Any, Dict, List, Optional, Union
 
-
-__version__ = "1.0.3"
+__version__ = "1.0.7"
 __author__ = "Diogo Novo"
 __email__ = "contact@nseek.io"
 __license__ = "MIT"
-__description__ = "High-performance exact vector similarity search with Rust backend"
+__description__ = "Exact vector similarity search with Rust backend"
 __url__ = "https://github.com/NSeek-AI/nseekfs"
-
 
 __version_info__ = tuple(map(int, __version__.split('.')))
 
 
-# Version compatibility check
 def _check_compatibility():
-    """Check system compatibility and warn about changes"""
+    """Check Python version"""
     if sys.version_info < (3, 8):
         raise RuntimeError(f"Python 3.8+ required, got {sys.version_info.major}.{sys.version_info.minor}")
 
 
 def _hl():
-    """Lazy import of highlevel module with error handling"""
+    """Import high-level module"""
     try:
         return import_module("nseekfs.highlevel")
     except ImportError as e:
-        raise ImportError(f"Failed to import nseekfs.highlevel: {e}. Please ensure NSeekFS is properly installed.")
+        raise ImportError(f"Failed to import nseekfs.highlevel: {e}")
+
 
 def _ll():
-    """Lazy import of low-level module with error handling"""
+    """Import low-level module"""
     try:
         return import_module("nseekfs.nseekfs")
     except ImportError as e:
-        raise ImportError(f"Failed to import nseekfs.nseekfs: {e}.")
+        raise ImportError(f"Failed to import nseekfs.nseekfs: {e}")
 
 
-# Check compatibility at import
 _check_compatibility()
 
 
-# MAIN API - The essentials
-def from_embeddings(vectors, normalized=True, verbose=False):
-    """Create index from embeddings - main entry point"""
-    return _hl().from_embeddings(vectors, normalized=normalized, verbose=verbose)
+def from_embeddings(vectors, metric="cosine", normalized=True, verbose=False):
+    """Create index from embeddings"""
+    return _hl().from_embeddings(vectors, metric=metric, normalized=normalized, verbose=verbose)
 
 
 def from_bin(bin_file_path, verbose=False):
@@ -81,44 +64,39 @@ def health_check(quick=True, verbose=True):
 
 
 def benchmark(vectors=1000, dims=384, queries=100, verbose=True):
-    """Run performance benchmark"""
+    """Run a benchmark with synthetic data"""
     import numpy as np
     import time
-    
+
     print(f"NSeekFS Benchmark: {vectors} vectors, {dims}D, {queries} queries")
-    
-    # Generate test data
+
     data_start = time.time()
     test_vectors = np.random.randn(vectors, dims).astype(np.float32)
     test_queries = np.random.randn(queries, dims).astype(np.float32)
-
     test_vectors /= np.linalg.norm(test_vectors, axis=1, keepdims=True)
     test_queries /= np.linalg.norm(test_queries, axis=1, keepdims=True)
-
     data_gen_time = time.time() - data_start
-    
-    # Build index
+
     build_start = time.time()
     index = from_embeddings(test_vectors, verbose=verbose)
     build_time = time.time() - build_start
-    
-    # Query benchmark
+
     query_times = []
     for i in range(queries):
         query_start = time.time()
         _ = index.query(test_queries[i], top_k=10)
         query_time = time.time() - query_start
         query_times.append(query_time)
-    
+
     avg_query_time = np.mean(query_times)
-    
+
     try:
         import psutil
         memory_usage = psutil.Process().memory_info().rss / (1024 * 1024)
     except ImportError:
         memory_usage = 0.0
-    
-    benchmark_results = {
+
+    results = {
         "data_generation_time_s": data_gen_time,
         "index_build_time_s": build_time,
         "avg_query_time_ms": avg_query_time * 1000,
@@ -126,28 +104,26 @@ def benchmark(vectors=1000, dims=384, queries=100, verbose=True):
         "vectors_per_second": vectors / build_time,
         "memory_usage_mb": memory_usage,
     }
-    
+
     if verbose:
-        print(f" Benchmark Results:")
+        print(" Benchmark Results:")
         print(f"   Index creation: {build_time:.2f}s")
         print(f"   Avg query time: {avg_query_time * 1000:.2f}ms")
-        print(f"   Queries/sec: {benchmark_results['queries_per_second']:.0f}")
+        print(f"   Queries/sec: {results['queries_per_second']:.0f}")
         print(f"   Memory usage: {memory_usage:.1f}MB")
-    
-    return benchmark_results
+
+    return results
 
 
-# LAZY LOADING: Advanced classes for when needed
 def _get_search_engine_class():
-    """Get SearchEngine class (lazy)"""
     return _hl().SearchEngine
 
+
 def _get_search_config_class():
-    """Get SearchConfig class (lazy)"""
     return _hl().SearchConfig
 
+
 def _get_pysearchengine_class():
-    """Get PySearchEngine class (lazy)"""
     return _ll().PySearchEngine
 
 
@@ -155,61 +131,49 @@ class _LazyClass:
     def __init__(self, loader_func):
         self._loader = loader_func
         self._loaded = None
-    
+
     def __call__(self, *args, **kwargs):
         if self._loaded is None:
             self._loaded = self._loader()
         return self._loaded(*args, **kwargs)
-    
+
     def __getattr__(self, name):
         if self._loaded is None:
             self._loaded = self._loader()
         return getattr(self._loaded, name)
 
 
-# Advanced classes (lazy loaded)
 SearchEngine = _LazyClass(_get_search_engine_class)
 SearchConfig = _LazyClass(_get_search_config_class)
 PySearchEngine = _LazyClass(_get_pysearchengine_class)
 
-# Compatibility aliases
 build_from_embeddings = from_embeddings
-build_index = from_embeddings 
+build_index = from_embeddings
 from_vectors = from_embeddings
 fit_embeddings = from_embeddings
 build_from_bin = from_bin
 load_index = from_bin
 read_index = from_bin
 
-# Show version info in interactive sessions
 if hasattr(sys, 'ps1') or hasattr(sys, 'ps2'):
     try:
-        # Test basic import
         _hl()
-        print(f" NSeekFS v{__version__} loaded successfully")
-        print(f"    Quick start: nseekfs.from_embeddings(vectors)")
-        print(f"    Simple query: index.query(vector, top_k=10)")
-        print(f"    Health check: nseekfs.health_check()")
+        print(f"NSeekFS v{__version__} loaded")
+        print("   Quick start: nseekfs.from_embeddings(vectors)")
+        print("   Simple query: index.query(vector, top_k=10)")
     except ImportError as e:
-        print(f"  NSeekFS v{__version__} loaded with issues:")
+        print(f"NSeekFS v{__version__} loaded with issues:")
         print(f"   Error: {e}")
-        print(f"   Run nseekfs.health_check() for diagnosis")
 
 
-# CLEAN API: Only essential exports
 __all__ = [
-    # Core functions
     'from_embeddings',
-    'from_bin', 
+    'from_bin',
     'health_check',
     'benchmark',
-    
-    # Advanced classes (lazy loaded)
     'SearchEngine',
-    'SearchConfig', 
+    'SearchConfig',
     'PySearchEngine',
-    
-    # Compatibility
     'build_from_embeddings',
     'build_index',
     'from_vectors',
@@ -217,8 +181,6 @@ __all__ = [
     'build_from_bin',
     'load_index',
     'read_index',
-    
-    # Metadata
     '__version__',
     '__version_info__',
     '__author__',
