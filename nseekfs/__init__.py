@@ -13,7 +13,7 @@ import warnings
 from importlib import import_module
 from typing import Any, Dict, List, Optional, Union
 
-__version__ = "1.0.7"
+__version__ = "1.1.0"
 __author__ = "Diogo Novo"
 __email__ = "contact@nseek.io"
 __license__ = "MIT"
@@ -115,6 +115,58 @@ def benchmark(vectors=1000, dims=384, queries=100, verbose=True):
     return results
 
 
+def export_audit(result, path):
+    """Export audit.json from a detailed result"""
+    return _hl().export_audit(result, path)
+
+
+def replay(audit_path):
+    """Replay a query from audit.json and validate determinism"""
+    return _hl().replay(audit_path)
+
+
+def query_exact_certified(
+    index,
+    query_vector,
+    top_k=10,
+    block_size=64,
+    enable_pruning=True,
+    return_certificate=True,
+    strict_query_normalized=False,
+):
+    """Run certified exact query with deterministic pruning"""
+    if not hasattr(index, "query_exact_certified"):
+        raise TypeError("index must be a SearchEngine instance")
+    return index.query_exact_certified(
+        query_vector,
+        top_k=top_k,
+        block_size=block_size,
+        enable_pruning=enable_pruning,
+        return_certificate=return_certificate,
+        strict_query_normalized=strict_query_normalized,
+    )
+
+
+def query_batch_exact_certified(
+    index,
+    queries,
+    top_k=10,
+    block_size=64,
+    enable_pruning=True,
+    return_certificate=True,
+):
+    """Run certified exact query in batch mode"""
+    if not hasattr(index, "query_batch_exact_certified"):
+        raise TypeError("index must be a SearchEngine instance")
+    return index.query_batch_exact_certified(
+        queries,
+        top_k=top_k,
+        block_size=block_size,
+        enable_pruning=enable_pruning,
+        return_certificate=return_certificate,
+    )
+
+
 def _get_search_engine_class():
     return _hl().SearchEngine
 
@@ -171,6 +223,10 @@ __all__ = [
     'from_bin',
     'health_check',
     'benchmark',
+    'export_audit',
+    'replay',
+    'query_exact_certified',
+    'query_batch_exact_certified',
     'SearchEngine',
     'SearchConfig',
     'PySearchEngine',
